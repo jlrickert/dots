@@ -1,0 +1,8 @@
+core:
+  link_strategy: symlink
+
+taps:
+  personal:
+    url: git@github.com:testuser/dotfiles.git
+    branch: main
+    provider: github

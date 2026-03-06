@@ -1,0 +1,9 @@
+package:
+  name: git
+  description: Git configuration
+  version: 1.0.0
+  tags: [git, vcs]
+
+links:
+  .gitconfig: .gitconfig
+  .gitignore_global: .gitignore_global

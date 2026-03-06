@@ -1,0 +1,19 @@
+package:
+  name: nvim
+  description: Neovim configuration
+  version: 1.0.0
+  tags: [editor, neovim]
+
+links:
+  init.lua: "@config/nvim/init.lua"
+  lua/: "@config/nvim/lua/"
+
+hooks:
+  post_install: scripts/install-plugins.sh
+
+platform:
+  darwin:
+    links:
+      helpers/mac-clipboard.lua: "@config/nvim/lua/clipboard.lua"
+    hooks:
+      post_install: scripts/install-plugins-mac.sh
