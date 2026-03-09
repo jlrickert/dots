@@ -1,7 +1,6 @@
 package dotsctl
 
 import (
-	"os"
 	"path/filepath"
 
 	"github.com/jlrickert/cli-toolkit/toolkit"
@@ -21,7 +20,7 @@ type platform = dots.Platform
 func NewPathService(p dots.Platform, rt *toolkit.Runtime) *PathService {
 	return &PathService{
 		Platform: p,
-		Resolver: dots.NewAliasResolver(p, os.Getenv),
+		Resolver: dots.NewAliasResolver(p, rt.Get),
 		runtime:  rt,
 	}
 }
