@@ -50,6 +50,7 @@ func newInstallCmd(deps *Deps) *cobra.Command {
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would happen without writing")
 	cmd.Flags().StringVar(&strategy, "strategy", "", "Override link strategy (symlink, copy, hardlink)")
+	cmd.ValidArgsFunction = completeAvailablePackages(deps)
 
 	return cmd
 }

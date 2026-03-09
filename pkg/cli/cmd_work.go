@@ -24,7 +24,7 @@ func newWorkCmd(deps *Deps) *cobra.Command {
 }
 
 func newWorkOnCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "on <tap> <local-path>",
 		Short: "Rewire links to a local checkout",
 		Args:  cobra.ExactArgs(2),
@@ -43,10 +43,18 @@ func newWorkOnCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return completeTapNames(deps)(cmd, args, toComplete)
+		}
+		// Second arg is a local path — let the shell do directory completion.
+		return nil, cobra.ShellCompDirectiveFilterDirs
+	}
+	return cmd
 }
 
 func newWorkOffCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "off <tap>",
 		Short: "Rewire links back to internal clone",
 		Args:  cobra.ExactArgs(1),
@@ -62,6 +70,8 @@ func newWorkOffCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = completeTapNames(deps)
+	return cmd
 }
 
 func newWorkStatusCmd(deps *Deps) *cobra.Command {
@@ -91,7 +101,7 @@ func newWorkStatusCmd(deps *Deps) *cobra.Command {
 }
 
 func newWorkRebuildCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "rebuild [<tap>/<package>]",
 		Short: "Re-link after local changes",
 		Args:  cobra.MaximumNArgs(1),
@@ -111,4 +121,6 @@ func newWorkRebuildCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = completeInstalledPackages(deps)
+	return cmd
 }

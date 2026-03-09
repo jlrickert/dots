@@ -56,7 +56,7 @@ func newTapAddCmd(deps *Deps) *cobra.Command {
 }
 
 func newTapRemoveCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:     "remove <name>",
 		Aliases: []string{"rm"},
 		Short:   "Remove a registered tap",
@@ -75,6 +75,10 @@ func newTapRemoveCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.ValidArgsFunction = completeTapNames(deps)
+
+	return cmd
 }
 
 func newTapListCmd(deps *Deps) *cobra.Command {
@@ -103,7 +107,7 @@ func newTapListCmd(deps *Deps) *cobra.Command {
 }
 
 func newTapUpdateCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "update [<name>]",
 		Short: "Update tap(s) to latest",
 		Args:  cobra.MaximumNArgs(1),
@@ -130,4 +134,8 @@ func newTapUpdateCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.ValidArgsFunction = completeTapNames(deps)
+
+	return cmd
 }

@@ -44,6 +44,7 @@ func newSyncCmd(deps *Deps) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&all, "all", false, "Sync all copy-strategy packages")
+	cmd.ValidArgsFunction = completeInstalledPackages(deps)
 
 	return cmd
 }

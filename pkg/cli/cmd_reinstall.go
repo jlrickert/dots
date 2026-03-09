@@ -28,5 +28,7 @@ func newReinstallCmd(deps *Deps) *cobra.Command {
 		},
 	}
 
+	cmd.ValidArgsFunction = completeInstalledPackages(deps)
+
 	return cmd
 }

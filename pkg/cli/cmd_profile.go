@@ -49,7 +49,7 @@ func newProfileCreateCmd(deps *Deps) *cobra.Command {
 }
 
 func newProfileDeleteCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "delete <name>",
 		Short: "Delete a profile",
 		Args:  cobra.ExactArgs(1),
@@ -65,6 +65,8 @@ func newProfileDeleteCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = completeProfileNames(deps)
+	return cmd
 }
 
 func newProfileListCmd(deps *Deps) *cobra.Command {
@@ -91,7 +93,7 @@ func newProfileListCmd(deps *Deps) *cobra.Command {
 }
 
 func newProfileShowCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "show <name>",
 		Short: "Show profile details",
 		Args:  cobra.ExactArgs(1),
@@ -116,10 +118,12 @@ func newProfileShowCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = completeProfileNames(deps)
+	return cmd
 }
 
 func newProfileAddCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "add <name> <tap>/<package>...",
 		Short: "Add packages to a profile",
 		Args:  cobra.MinimumNArgs(2),
@@ -135,10 +139,17 @@ func newProfileAddCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return completeProfileNames(deps)(cmd, args, toComplete)
+		}
+		return completeAvailablePackages(deps)(cmd, nil, toComplete)
+	}
+	return cmd
 }
 
 func newProfileRemoveCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "remove <name> <tap>/<package>",
 		Short: "Remove a package from a profile",
 		Args:  cobra.ExactArgs(2),
@@ -154,10 +165,17 @@ func newProfileRemoveCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return completeProfileNames(deps)(cmd, args, toComplete)
+		}
+		return completeAvailablePackages(deps)(cmd, nil, toComplete)
+	}
+	return cmd
 }
 
 func newProfileApplyCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "apply <name>",
 		Short: "Install all packages in a profile",
 		Args:  cobra.ExactArgs(1),
@@ -173,10 +191,12 @@ func newProfileApplyCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = completeProfileNames(deps)
+	return cmd
 }
 
 func newProfileSwitchCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "switch <name>",
 		Short: "Switch to a different profile",
 		Args:  cobra.ExactArgs(1),
@@ -192,10 +212,12 @@ func newProfileSwitchCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = completeProfileNames(deps)
+	return cmd
 }
 
 func newProfileExportCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "export <name>",
 		Short: "Export profile as YAML",
 		Args:  cobra.ExactArgs(1),
@@ -212,6 +234,8 @@ func newProfileExportCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = completeProfileNames(deps)
+	return cmd
 }
 
 func newProfileImportCmd(deps *Deps) *cobra.Command {

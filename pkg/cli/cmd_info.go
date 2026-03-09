@@ -64,6 +64,7 @@ func newInfoCmd(deps *Deps) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&showPlatform, "platform", false, "Show platform info")
+	cmd.ValidArgsFunction = completeAvailablePackages(deps)
 
 	return cmd
 }

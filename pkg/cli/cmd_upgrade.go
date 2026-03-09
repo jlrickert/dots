@@ -39,6 +39,7 @@ func newUpgradeCmd(deps *Deps) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&all, "all", false, "Upgrade all installed packages")
+	cmd.ValidArgsFunction = completeInstalledPackages(deps)
 
 	return cmd
 }

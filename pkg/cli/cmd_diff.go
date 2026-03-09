@@ -7,7 +7,7 @@ import (
 )
 
 func newDiffCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "diff <tap>/<package>",
 		Short: "Show differences between source and installed files",
 		Args:  cobra.ExactArgs(1),
@@ -34,4 +34,8 @@ func newDiffCmd(deps *Deps) *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.ValidArgsFunction = completeInstalledPackages(deps)
+
+	return cmd
 }
