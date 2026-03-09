@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/jlrickert/dots/pkg/dots"
+	"gopkg.in/yaml.v3"
 )
 
 // InitOptions configures the init operation.
@@ -18,6 +19,8 @@ type InitOptions struct {
 
 // Init initializes the dots environment: creates config and state directories,
 // writes a default config, and optionally registers an initial tap.
+// When --from and --path are provided, it clones the tap, finds the dots
+// package at the given path, and installs it (self-bootstrapping).
 func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 	// Create directories.
 	configDir := d.PathService.ConfigDir()
@@ -35,6 +38,11 @@ func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 		return fmt.Errorf("create profiles dir: %w", err)
 	}
 
+	tapsDir := d.PathService.TapsDir()
+	if err := os.MkdirAll(tapsDir, 0o755); err != nil {
+		return fmt.Errorf("create taps dir: %w", err)
+	}
+
 	// Write default config if none exists.
 	configPath := d.ConfigService.ConfigPath
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -44,8 +52,16 @@ func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 				URL: opts.From,
 			}
 		}
-		// Config writing will be handled by FsRepo in later phases.
-		// For now, just ensure directories exist.
+
+		data, err := yaml.Marshal(&cfg)
+		if err != nil {
+			return fmt.Errorf("marshal config: %w", err)
+		}
+		if err := os.WriteFile(configPath, data, 0o644); err != nil {
+			return fmt.Errorf("write config: %w", err)
+		}
+
+		d.ConfigService.InvalidateCache()
 	}
 
 	// Register the initial tap if --from is provided.
@@ -57,6 +73,18 @@ func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 		})
 		if err != nil && err != dots.ErrExist {
 			return fmt.Errorf("register tap: %w", err)
+		}
+
+		// If --path is provided, install the dots package from the tap.
+		// This is the self-bootstrapping flow: the dots package manages
+		// dots' own config as a regular package.
+		if opts.Path != "" {
+			_, err := d.Install(ctx, InstallOptions{
+				Package: tapName + "/" + opts.Path,
+			})
+			if err != nil {
+				return fmt.Errorf("install bootstrap package: %w", err)
+			}
 		}
 	}
 
