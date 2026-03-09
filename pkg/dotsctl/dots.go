@@ -43,7 +43,7 @@ func NewDots(opts DotsOptions) (*Dots, error) {
 
 	repo := opts.Repo
 	if repo == nil {
-		repo = dots.NewMemoryRepo()
+		repo = dots.NewFsRepo(pathService.ConfigDir(), pathService.StateDir())
 	}
 
 	return &Dots{
