@@ -99,6 +99,8 @@ func NewRootCmd(deps *Deps) *cobra.Command {
 		newWhichCmd(deps),
 		newProfileCmd(deps),
 		newWorkCmd(deps),
+		newSearchCmd(deps),
+		newBrowseCmd(deps),
 	)
 
 	return cmd
