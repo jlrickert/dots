@@ -18,15 +18,21 @@ import (
 type FsRepo struct {
 	ConfigDir string // e.g. ~/.config/dots
 	StateDir  string // e.g. ~/.local/state/dots
+	Git       GitClient
 
 	mu sync.RWMutex
 }
 
 // NewFsRepo creates a filesystem-backed repository.
-func NewFsRepo(configDir, stateDir string) *FsRepo {
+// If git is nil, ExecGitClient is used.
+func NewFsRepo(configDir, stateDir string, git GitClient) *FsRepo {
+	if git == nil {
+		git = NewExecGitClient()
+	}
 	return &FsRepo{
 		ConfigDir: configDir,
 		StateDir:  stateDir,
+		Git:       git,
 	}
 }
 
@@ -105,8 +111,19 @@ func (r *FsRepo) AddTap(ctx context.Context, tap TapInfo) error {
 		return ErrExist
 	}
 
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create tap dir: %w", err)
+	// Ensure parent directory exists.
+	if err := os.MkdirAll(r.tapsDir(), 0o755); err != nil {
+		return fmt.Errorf("create taps dir: %w", err)
+	}
+
+	// Clone the repository into the tap directory.
+	err := r.Git.Clone(ctx, tap.URL, dir, GitCloneOpts{
+		Branch: tap.Branch,
+	})
+	if err != nil {
+		// Clean up partial clone on failure.
+		os.RemoveAll(dir)
+		return fmt.Errorf("clone tap %s: %w", tap.Name, err)
 	}
 
 	return r.writeTapInfo(&tap)
@@ -133,8 +150,9 @@ func (r *FsRepo) UpdateTap(ctx context.Context, name string) error {
 		return &TapNotFoundError{Name: name}
 	}
 
-	// Git pull will be implemented when git operations are wired.
-	// For now, verify the tap exists.
+	if err := r.Git.Pull(ctx, dir); err != nil {
+		return fmt.Errorf("update tap %s: %w", name, err)
+	}
 	return nil
 }
 

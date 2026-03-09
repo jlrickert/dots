@@ -13,9 +13,17 @@ import (
 func newFsRepo(t *testing.T) *dots.FsRepo {
 	t.Helper()
 	dir := t.TempDir()
+	// Use a stub that creates the dest directory (simulating a clone)
+	// so metadata can be written into it.
+	stub := &dots.StubGitClient{
+		CloneFunc: func(_ context.Context, _, dest string, _ dots.GitCloneOpts) error {
+			return os.MkdirAll(dest, 0o755)
+		},
+	}
 	return dots.NewFsRepo(
 		filepath.Join(dir, "config"),
 		filepath.Join(dir, "state"),
+		stub,
 	)
 }
 
