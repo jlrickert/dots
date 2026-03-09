@@ -82,5 +82,24 @@ func NewRootCmd(deps *Deps) *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&deps.LogJSON, "log-json", false, "output logs as JSON")
 	cmd.PersistentFlags().StringVarP(&deps.ConfigPath, "config", "c", "", "path to config file")
 
+	// Wire subcommands
+	cmd.AddCommand(
+		newInitCmd(deps),
+		newInstallCmd(deps),
+		newRemoveCmd(deps),
+		newUpgradeCmd(deps),
+		newReinstallCmd(deps),
+		newListCmd(deps),
+		newStatusCmd(deps),
+		newDoctorCmd(deps),
+		newTapCmd(deps),
+		newSyncCmd(deps),
+		newInfoCmd(deps),
+		newDiffCmd(deps),
+		newWhichCmd(deps),
+		newProfileCmd(deps),
+		newWorkCmd(deps),
+	)
+
 	return cmd
 }
