@@ -3,7 +3,6 @@ package dotsctl
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -215,10 +214,3 @@ func splitPackageRef(ref string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-// hookRunnerSink creates a hook runner that discards output.
-func hookRunnerSink() *dots.HookRunner {
-	return &dots.HookRunner{
-		Stdout: io.Discard,
-		Stderr: io.Discard,
-	}
-}
