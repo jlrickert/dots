@@ -1,0 +1,55 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: dots
+    binary: dots
+    main: ./cmd/dots
+    env: [CGO_ENABLED=0, GOWORK=off]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags: ["-s -w -X github.com/jlrickert/dots/pkg/cli.Version={{.Version}}"]
+
+archives:
+  - id: dots
+    ids: [dots]
+    name_template: "dots_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [LICENSE, README.md, CHANGELOG.md]
+
+brews:
+  - ids: [dots]
+    name: dots
+    repository:
+      owner: jlrickert
+      name: homebrew-formulae
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/jlrickert/dots"
+    description: "A brew-style dotfile package manager with taps, profiles, overlays, and cross-platform support"
+    license: "Apache-2.0"
+    install: |
+      bin.install "dots"
+      generate_completions_from_executable(bin/"dots", "completion")
+    test: |
+      system "#{bin}/dots", "--version"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^chore: release v"
+      - "^Merge"
+
+release:
+  footer: |
+    ---
+    Released with [GoReleaser](https://goreleaser.com).

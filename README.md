@@ -4,11 +4,31 @@ A brew-style dotfile package manager with taps, profiles, overlays, and cross-pl
 
 ## Installation
 
+### Homebrew (macOS and Linux)
+
+```bash
+brew install jlrickert/formulae/dots
+```
+
+Shell completions for zsh, bash, and fish are installed automatically.
+
 ### From source
+
+Prerequisite: Go 1.25.0 or newer.
 
 ```bash
 go install github.com/jlrickert/dots/cmd/dots@latest
 ```
+
+If needed, add your Go bin directory to `PATH`:
+
+```bash
+export PATH="$(go env GOPATH)/bin:$PATH"
+```
+
+### Precompiled binaries
+
+Download from [GitHub Releases](https://github.com/jlrickert/dots/releases).
 
 ### Build from repo
 
