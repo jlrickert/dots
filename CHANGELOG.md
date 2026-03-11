@@ -1,0 +1,41 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+## v0.1.0 - 2026-03-11
+
+
+
+### Bug Fixes
+- resolve git push failure in CI for UpdateTap test
+
+
+### Documentation
+- add CLAUDE.md with architecture, testing, and conventions
+- add comprehensive README with installation, usage, and configuration
+
+
+### Features
+- scaffold project skeleton with Cobra root command
+- add platform detection, path alias resolution, and cascade merge
+- add Repository interface, MemoryRepo, and error types
+- add config and manifest parsing with platform cascade resolution
+- add service layer with file-per-operation pattern
+- add test infrastructure with sandbox, fixtures, and RunCommand harness
+- implement FsRepo filesystem-backed Repository
+- add link placement engine and hook runner
+- add install, remove, upgrade, and reinstall operations
+- add tap, sync, info, profile, and work mode operations
+- wire all CLI commands to service layer
+- add overlay and merge system
+- enhance init with config writing and self-bootstrapping
+- add GitClient interface and wire git clone/pull into FsRepo
+- add shell completions for all CLI commands
+- add search and browse discovery commands
+- add GoReleaser config, release workflow, and Homebrew formula
+- add CI workflow for tests on push and PR
+
+
+### Refactor
+- remove unused hookRunnerSink function
+
