@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## v0.2.1 - 2026-03-11
+
+
+
+### Bug Fixes
+- persist work mode config and resolve packages from local path
+- make work mode aware of package listing and use Runtime for I/O
+- support inline hook commands and work-mode-aware completions
+
+
 ## v0.1.0 - 2026-03-11
 
 
