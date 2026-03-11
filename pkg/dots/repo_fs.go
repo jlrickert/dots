@@ -167,6 +167,15 @@ func (r *FsRepo) ListPackages(ctx context.Context, tap string) ([]PackageInfo, e
 		return nil, &TapNotFoundError{Name: tap}
 	}
 
+	return ScanPackages(tap, dir)
+}
+
+// ScanPackages walks a directory for Dotfile.yaml files and returns discovered packages.
+func ScanPackages(tap, dir string) ([]PackageInfo, error) {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil, &TapNotFoundError{Name: tap}
+	}
+
 	var packages []PackageInfo
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {

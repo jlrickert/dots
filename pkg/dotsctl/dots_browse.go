@@ -22,7 +22,7 @@ type BrowsePackage struct {
 
 // Browse lists packages in a tap with their metadata.
 func (d *Dots) Browse(ctx context.Context, tap string) (*BrowseResult, error) {
-	pkgs, err := d.Repo.ListPackages(ctx, tap)
+	pkgs, err := d.listPackages(ctx, tap)
 	if err != nil {
 		return nil, err
 	}

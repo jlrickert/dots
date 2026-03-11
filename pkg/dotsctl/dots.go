@@ -39,7 +39,7 @@ func NewDots(opts DotsOptions) (*Dots, error) {
 	if configPath == "" {
 		configPath = pathService.UserConfigFile()
 	}
-	configService := NewConfigService(pathService, configPath)
+	configService := NewConfigService(pathService, configPath, rt)
 
 	repo := opts.Repo
 	if repo == nil {

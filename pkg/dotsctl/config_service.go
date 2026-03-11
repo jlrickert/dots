@@ -1,22 +1,26 @@
 package dotsctl
 
 import (
+	"github.com/jlrickert/cli-toolkit/toolkit"
 	"github.com/jlrickert/dots/pkg/dots"
+	"gopkg.in/yaml.v3"
 )
 
 // ConfigService loads and merges dots configuration with caching.
 type ConfigService struct {
 	PathService *PathService
 	ConfigPath  string
+	Runtime     *toolkit.Runtime
 
 	cached *dots.Config
 }
 
 // NewConfigService creates a ConfigService.
-func NewConfigService(ps *PathService, configPath string) *ConfigService {
+func NewConfigService(ps *PathService, configPath string, rt *toolkit.Runtime) *ConfigService {
 	return &ConfigService{
 		PathService: ps,
 		ConfigPath:  configPath,
+		Runtime:     rt,
 	}
 }
 
@@ -41,7 +45,11 @@ func (s *ConfigService) Config(cache bool) (*dots.Config, error) {
 
 // Save writes the current config to disk and updates the cache.
 func (s *ConfigService) Save(cfg *dots.Config) error {
-	if err := dots.SaveConfigFile(s.ConfigPath, cfg); err != nil {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	if err := s.Runtime.WriteFile(s.ConfigPath, data, 0o644); err != nil {
 		return err
 	}
 	s.cached = cfg

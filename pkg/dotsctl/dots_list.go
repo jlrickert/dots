@@ -54,7 +54,7 @@ func (d *Dots) listInstalled(ctx context.Context, opts ListOptions) (*ListResult
 
 func (d *Dots) listAvailable(ctx context.Context, opts ListOptions) (*ListResult, error) {
 	if opts.Tap != "" {
-		pkgs, err := d.Repo.ListPackages(ctx, opts.Tap)
+		pkgs, err := d.listPackages(ctx, opts.Tap)
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +68,7 @@ func (d *Dots) listAvailable(ctx context.Context, opts ListOptions) (*ListResult
 
 	var all []dots.PackageInfo
 	for _, tap := range taps {
-		pkgs, err := d.Repo.ListPackages(ctx, tap.Name)
+		pkgs, err := d.listPackages(ctx, tap.Name)
 		if err != nil {
 			return nil, err
 		}

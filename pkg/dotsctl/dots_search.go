@@ -36,7 +36,7 @@ func (d *Dots) Search(ctx context.Context, query string) ([]SearchResult, error)
 	var results []SearchResult
 
 	for _, tap := range taps {
-		pkgs, err := d.Repo.ListPackages(ctx, tap.Name)
+		pkgs, err := d.listPackages(ctx, tap.Name)
 		if err != nil {
 			continue
 		}

@@ -3,7 +3,6 @@ package dotsctl
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -200,7 +199,7 @@ func (d *Dots) readManifest(ctx context.Context, tap, pkg string) ([]byte, error
 	if cfg != nil {
 		if localPath, ok := cfg.WorkMode[tap]; ok {
 			manifestPath := localPath + "/" + pkg + "/Dotfile.yaml"
-			data, err := os.ReadFile(manifestPath)
+			data, err := d.Runtime.ReadFile(manifestPath)
 			if err != nil {
 				return nil, &dots.PackageNotFoundError{Tap: tap, Package: pkg}
 			}
@@ -208,6 +207,17 @@ func (d *Dots) readManifest(ctx context.Context, tap, pkg string) ([]byte, error
 		}
 	}
 	return d.Repo.ReadManifest(ctx, tap, pkg)
+}
+
+// listPackages lists packages in a tap, checking work mode paths first.
+func (d *Dots) listPackages(ctx context.Context, tap string) ([]dots.PackageInfo, error) {
+	cfg, _ := d.ConfigService.Config(true)
+	if cfg != nil {
+		if localPath, ok := cfg.WorkMode[tap]; ok {
+			return dots.ScanPackages(tap, localPath)
+		}
+	}
+	return d.Repo.ListPackages(ctx, tap)
 }
 
 func (d *Dots) packageDir(tap, pkg string) string {
