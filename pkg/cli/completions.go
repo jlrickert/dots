@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 
+	"github.com/jlrickert/dots/pkg/dotsctl"
 	"github.com/spf13/cobra"
 )
 
@@ -16,19 +17,13 @@ func completeAvailablePackages(deps *Deps) func(*cobra.Command, []string, string
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		taps, err := d.TapList(cmd.Context())
+		result, err := d.List(cmd.Context(), dotsctl.ListOptions{Available: true})
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
 		var completions []string
-		for _, tap := range taps {
-			pkgs, err := d.Repo.ListPackages(cmd.Context(), tap.Name)
-			if err != nil {
-				continue
-			}
-			for _, pkg := range pkgs {
-				completions = append(completions, fmt.Sprintf("%s/%s", tap.Name, pkg.Name))
-			}
+		for _, pkg := range result.Available {
+			completions = append(completions, fmt.Sprintf("%s/%s", pkg.Tap, pkg.Name))
 		}
 		return completions, cobra.ShellCompDirectiveNoFileComp
 	}

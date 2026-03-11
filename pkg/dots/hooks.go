@@ -18,32 +18,47 @@ type HookRunner struct {
 	Stderr io.Writer
 }
 
-// RunHook executes a hook script relative to the package directory.
-// hookPath is the relative path from the manifest (e.g. "scripts/install.sh").
-// pkgDir is the absolute path to the package directory.
-func (h *HookRunner) RunHook(ctx context.Context, hookPath, pkgDir string) error {
-	if hookPath == "" {
+// RunHook executes a hook, which may be either a script file path relative to
+// the package directory (e.g. "scripts/install.sh") or an inline shell command
+// (e.g. "launchctl load ~/Library/LaunchAgents/foo.plist").
+func (h *HookRunner) RunHook(ctx context.Context, hookValue, pkgDir string) error {
+	if hookValue == "" {
 		return nil
 	}
 
-	absPath := filepath.Join(pkgDir, filepath.FromSlash(hookPath))
+	env := append(os.Environ(), "DOTS_PACKAGE_DIR="+pkgDir)
 
-	if _, err := os.Stat(absPath); err != nil {
-		return fmt.Errorf("hook script not found: %s: %w", absPath, err)
+	// Check if it's a file path by joining with pkgDir and stat-ing.
+	absPath := filepath.Join(pkgDir, filepath.FromSlash(strings.TrimSpace(hookValue)))
+	if info, err := os.Stat(absPath); err == nil && !info.IsDir() {
+		shell, args := resolveShell(absPath)
+		cmd := exec.CommandContext(ctx, shell, append(args, absPath)...)
+		cmd.Dir = pkgDir
+		cmd.Stdout = h.Stdout
+		cmd.Stderr = h.Stderr
+		cmd.Env = env
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("hook %s failed: %w", hookValue, err)
+		}
+		return nil
 	}
 
-	shell, args := resolveShell(absPath)
+	// Otherwise treat as an inline shell command.
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/sh"
+	}
+	if runtime.GOOS == "windows" {
+		shell = "cmd.exe"
+	}
 
-	cmd := exec.CommandContext(ctx, shell, append(args, absPath)...)
+	cmd := exec.CommandContext(ctx, shell, "-c", hookValue)
 	cmd.Dir = pkgDir
 	cmd.Stdout = h.Stdout
 	cmd.Stderr = h.Stderr
-	cmd.Env = append(os.Environ(),
-		"DOTS_PACKAGE_DIR="+pkgDir,
-	)
-
+	cmd.Env = env
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("hook %s failed: %w", hookPath, err)
+		return fmt.Errorf("hook command failed: %w", err)
 	}
 	return nil
 }
