@@ -39,6 +39,15 @@ func (s *ConfigService) Config(cache bool) (*dots.Config, error) {
 	return cfg, nil
 }
 
+// Save writes the current config to disk and updates the cache.
+func (s *ConfigService) Save(cfg *dots.Config) error {
+	if err := dots.SaveConfigFile(s.ConfigPath, cfg); err != nil {
+		return err
+	}
+	s.cached = cfg
+	return nil
+}
+
 // InvalidateCache clears the cached config.
 func (s *ConfigService) InvalidateCache() {
 	s.cached = nil

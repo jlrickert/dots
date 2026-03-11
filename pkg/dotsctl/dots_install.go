@@ -3,6 +3,7 @@ package dotsctl
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -34,7 +35,7 @@ func (d *Dots) Install(ctx context.Context, opts InstallOptions) (*InstallResult
 	}
 
 	// Read and parse manifest
-	manifestData, err := d.Repo.ReadManifest(ctx, tap, pkg)
+	manifestData, err := d.readManifest(ctx, tap, pkg)
 	if err != nil {
 		return nil, fmt.Errorf("read manifest: %w", err)
 	}
@@ -193,7 +194,29 @@ func (d *Dots) resolveStrategy(override, pkgStrategy dots.LinkStrategy) dots.Lin
 	return dots.LinkSymlink
 }
 
+// readManifest reads a package manifest, checking work mode paths first.
+func (d *Dots) readManifest(ctx context.Context, tap, pkg string) ([]byte, error) {
+	cfg, _ := d.ConfigService.Config(true)
+	if cfg != nil {
+		if localPath, ok := cfg.WorkMode[tap]; ok {
+			manifestPath := localPath + "/" + pkg + "/Dotfile.yaml"
+			data, err := os.ReadFile(manifestPath)
+			if err != nil {
+				return nil, &dots.PackageNotFoundError{Tap: tap, Package: pkg}
+			}
+			return data, nil
+		}
+	}
+	return d.Repo.ReadManifest(ctx, tap, pkg)
+}
+
 func (d *Dots) packageDir(tap, pkg string) string {
+	cfg, _ := d.ConfigService.Config(true)
+	if cfg != nil {
+		if localPath, ok := cfg.WorkMode[tap]; ok {
+			return localPath + "/" + pkg
+		}
+	}
 	return d.PathService.TapsDir() + "/" + tap + "/" + pkg
 }
 

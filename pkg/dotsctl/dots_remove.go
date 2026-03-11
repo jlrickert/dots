@@ -41,7 +41,7 @@ func (d *Dots) Remove(ctx context.Context, opts RemoveOptions) error {
 
 	// Run pre_remove hook if manifest is available
 	pkgDir := d.packageDir(tap, pkg)
-	manifestData, _ := d.Repo.ReadManifest(ctx, tap, pkg)
+	manifestData, _ := d.readManifest(ctx, tap, pkg)
 	if manifestData != nil {
 		manifest, err := dots.ParseManifest(manifestData)
 		if err == nil {

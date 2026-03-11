@@ -3,6 +3,7 @@ package dots
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -75,6 +76,18 @@ func LoadConfigFile(path string) (*Config, error) {
 		return nil, err
 	}
 	return ParseConfig(data)
+}
+
+// SaveConfigFile writes a Config to disk as YAML.
+func SaveConfigFile(path string, cfg *Config) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
 }
 
 // MergeConfig merges override into base. Non-zero override fields win.

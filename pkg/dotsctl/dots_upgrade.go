@@ -38,7 +38,7 @@ func (d *Dots) Upgrade(ctx context.Context, opts UpgradeOptions) error {
 
 	// Run pre_upgrade hook
 	pkgDir := d.packageDir(tap, pkg)
-	manifestData, err := d.Repo.ReadManifest(ctx, tap, pkg)
+	manifestData, err := d.readManifest(ctx, tap, pkg)
 	if err != nil {
 		return fmt.Errorf("read manifest: %w", err)
 	}

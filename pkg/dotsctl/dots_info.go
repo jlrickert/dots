@@ -31,7 +31,7 @@ func (d *Dots) Info(ctx context.Context, pkgRef string) (*InfoResult, error) {
 	}
 
 	// Read manifest if available
-	manifestData, err := d.Repo.ReadManifest(ctx, tap, pkg)
+	manifestData, err := d.readManifest(ctx, tap, pkg)
 	if err == nil {
 		manifest, err := dots.ParseManifest(manifestData)
 		if err == nil {

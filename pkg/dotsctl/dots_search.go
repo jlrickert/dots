@@ -73,7 +73,7 @@ func (d *Dots) Search(ctx context.Context, query string) ([]SearchResult, error)
 }
 
 func (d *Dots) readAndParseManifest(ctx context.Context, tap, pkg string) (*dots.Manifest, error) {
-	data, err := d.Repo.ReadManifest(ctx, tap, pkg)
+	data, err := d.readManifest(ctx, tap, pkg)
 	if err != nil {
 		return nil, err
 	}

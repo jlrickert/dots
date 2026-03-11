@@ -29,6 +29,10 @@ func (d *Dots) WorkOn(ctx context.Context, opts WorkOnOptions) error {
 	}
 	cfg.WorkMode[opts.Tap] = opts.LocalPath
 
+	if err := d.ConfigService.Save(cfg); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
 	// Re-link all installed packages from this tap using local path
 	lockfile, err := d.Repo.ReadLockfile(ctx)
 	if err == nil {
@@ -53,6 +57,10 @@ func (d *Dots) WorkOff(ctx context.Context, tap string) error {
 		return fmt.Errorf("tap %q is not in work mode", tap)
 	}
 	delete(cfg.WorkMode, tap)
+
+	if err := d.ConfigService.Save(cfg); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
 
 	// Re-link packages from internal clone
 	lockfile, err := d.Repo.ReadLockfile(ctx)
