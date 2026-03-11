@@ -216,7 +216,7 @@ func TestFsRepo_UpdateTap_Pulls(t *testing.T) {
 	))
 	run(t, work, "git", "add", "-A")
 	run(t, work, "git", "commit", "-m", "add vim")
-	run(t, work, "git", "push", bare)
+	run(t, work, "git", "push", bare, "HEAD")
 
 	// Update should pull the new content
 	err = repo.UpdateTap(ctx, "personal")
