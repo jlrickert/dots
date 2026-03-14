@@ -6,6 +6,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// DotfileSchemaURL is the URL for the Dotfile.yaml JSON Schema.
+	DotfileSchemaURL = "https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json"
+	// DotfileSchemaModeline is the yaml-language-server modeline for Dotfile.yaml.
+	DotfileSchemaModeline = "# yaml-language-server: $schema=" + DotfileSchemaURL + "\n"
+)
+
 // Manifest represents a parsed Dotfile.yaml package manifest.
 type Manifest struct {
 	Package  ManifestPackage           `yaml:"package"`

@@ -7,6 +7,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// DotsConfigSchemaURL is the URL for the dots config JSON Schema.
+	DotsConfigSchemaURL      = "https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dots-config.json"
+	DotsConfigSchemaModeline = "# yaml-language-server: $schema=" + DotsConfigSchemaURL + "\n"
+)
+
 // Config represents the user's dots configuration (~/.config/dots/config.yaml).
 type Config struct {
 	Core     CoreConfig            `yaml:"core,omitempty"`

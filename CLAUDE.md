@@ -113,6 +113,14 @@ platform:
 - Check with `errors.Is()` for sentinels, `errors.As()` for typed errors.
 - `TapNotFoundError` and `PackageNotFoundError` both satisfy `errors.Is(err, ErrNotExist)`.
 
+## JSON Schemas
+
+- `schemas/dotfile.json` — Draft 7 schema for `Dotfile.yaml` package manifests.
+- `schemas/dots-config.json` — Draft 7 schema for `config.yaml` user configuration.
+- Schema URL constants and modeline strings live in `pkg/dots/config.go` and `pkg/dots/manifest.go`.
+- `ConfigService.Save` and `dots init` prepend the `yaml-language-server` modeline to written config files.
+- When adding new fields to `Config` or `Manifest` structs, update the corresponding JSON Schema file to keep them in sync.
+
 ## Gotchas
 
 - Path aliases always use forward slashes in manifests. `filepath.ToSlash`/`filepath.FromSlash` handles normalization at resolution time.

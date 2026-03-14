@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json",
+  "title": "Dotfile.yaml",
+  "description": "Schema for dots package manifest files (Dotfile.yaml)",
+  "type": "object",
+  "required": ["package"],
+  "additionalProperties": false,
+  "properties": {
+    "package": {
+      "type": "object",
+      "description": "Package metadata",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Package name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable package description"
+        },
+        "version": {
+          "type": "string",
+          "description": "Semantic version string"
+        },
+        "requires": {
+          "type": "array",
+          "description": "Other packages this package depends on",
+          "items": { "type": "string" }
+        },
+        "tags": {
+          "type": "array",
+          "description": "Searchable tags for this package",
+          "items": { "type": "string" }
+        },
+        "platforms": {
+          "type": "array",
+          "description": "Restrict installation to these platforms (e.g. darwin, linux, darwin-arm64)",
+          "items": { "type": "string" }
+        },
+        "link_strategy": {
+          "$ref": "#/definitions/link_strategy"
+        }
+      }
+    },
+    "links": {
+      "$ref": "#/definitions/links"
+    },
+    "hooks": {
+      "$ref": "#/definitions/hooks"
+    },
+    "overlay": {
+      "$ref": "#/definitions/overlay"
+    },
+    "merge": {
+      "type": "object",
+      "description": "Files to merge from multiple packages",
+      "additionalProperties": { "type": "string" }
+    },
+    "platform": {
+      "type": "object",
+      "description": "Platform-specific overrides keyed by OS or OS-arch",
+      "additionalProperties": {
+        "$ref": "#/definitions/platform_block"
+      }
+    }
+  },
+  "definitions": {
+    "link_strategy": {
+      "type": "string",
+      "description": "How files are linked to their targets",
+      "enum": ["symlink", "copy", "hardlink"]
+    },
+    "links": {
+      "type": "object",
+      "description": "Map of source file paths to target paths. Targets support @alias paths (@home, @config, @data, @cache, @state, @bin).",
+      "additionalProperties": { "type": "string" }
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Lifecycle hook scripts or inline commands",
+      "additionalProperties": false,
+      "properties": {
+        "pre_install": {
+          "type": "string",
+          "description": "Script path or inline command run before installation"
+        },
+        "post_install": {
+          "type": "string",
+          "description": "Script path or inline command run after installation"
+        },
+        "pre_remove": {
+          "type": "string",
+          "description": "Script path or inline command run before removal"
+        },
+        "post_remove": {
+          "type": "string",
+          "description": "Script path or inline command run after removal"
+        },
+        "pre_upgrade": {
+          "type": "string",
+          "description": "Script path or inline command run before upgrade"
+        },
+        "post_upgrade": {
+          "type": "string",
+          "description": "Script path or inline command run after upgrade"
+        }
+      }
+    },
+    "overlay": {
+      "type": "object",
+      "description": "Declares this package as a layer on top of a base package",
+      "required": ["base"],
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "string",
+          "description": "Base package reference (tap/package)"
+        },
+        "strategy": {
+          "type": "string",
+          "description": "How overlay content is combined with the base",
+          "enum": ["append", "prepend", "replace", "merge"]
+        },
+        "priority": {
+          "type": "integer",
+          "description": "Overlay priority (0-99, higher wins for replace)",
+          "minimum": 0,
+          "maximum": 99
+        }
+      }
+    },
+    "platform_block": {
+      "type": "object",
+      "description": "Platform-specific overrides",
+      "additionalProperties": false,
+      "properties": {
+        "links": {
+          "$ref": "#/definitions/links"
+        },
+        "hooks": {
+          "$ref": "#/definitions/hooks"
+        },
+        "requires": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "overlay": {
+          "$ref": "#/definitions/overlay"
+        },
+        "merge": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "link_strategy": {
+          "$ref": "#/definitions/link_strategy"
+        }
+      }
+    }
+  }
+}

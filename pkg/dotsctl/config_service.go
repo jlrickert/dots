@@ -49,7 +49,8 @@ func (s *ConfigService) Save(cfg *dots.Config) error {
 	if err != nil {
 		return err
 	}
-	if err := s.Runtime.WriteFile(s.ConfigPath, data, 0o644); err != nil {
+	out := append([]byte(dots.DotsConfigSchemaModeline), data...)
+	if err := s.Runtime.WriteFile(s.ConfigPath, out, 0o644); err != nil {
 		return err
 	}
 	s.cached = cfg

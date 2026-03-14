@@ -3,7 +3,6 @@ package dotsctl
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/jlrickert/dots/pkg/dots"
 	"gopkg.in/yaml.v3"
@@ -24,28 +23,28 @@ type InitOptions struct {
 func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 	// Create directories.
 	configDir := d.PathService.ConfigDir()
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
+	if err := d.Runtime.Mkdir(configDir, 0o755, true); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
 	stateDir := d.PathService.StateDir()
-	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+	if err := d.Runtime.Mkdir(stateDir, 0o755, true); err != nil {
 		return fmt.Errorf("create state dir: %w", err)
 	}
 
 	profilesDir := d.PathService.ProfilesDir()
-	if err := os.MkdirAll(profilesDir, 0o755); err != nil {
+	if err := d.Runtime.Mkdir(profilesDir, 0o755, true); err != nil {
 		return fmt.Errorf("create profiles dir: %w", err)
 	}
 
 	tapsDir := d.PathService.TapsDir()
-	if err := os.MkdirAll(tapsDir, 0o755); err != nil {
+	if err := d.Runtime.Mkdir(tapsDir, 0o755, true); err != nil {
 		return fmt.Errorf("create taps dir: %w", err)
 	}
 
 	// Write default config if none exists.
 	configPath := d.ConfigService.ConfigPath
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if _, err := d.Runtime.Stat(configPath, true); err != nil {
 		cfg := dots.DefaultConfig()
 		if opts.From != "" {
 			cfg.Taps["default"] = dots.TapConfig{
@@ -57,7 +56,8 @@ func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 		if err != nil {
 			return fmt.Errorf("marshal config: %w", err)
 		}
-		if err := os.WriteFile(configPath, data, 0o644); err != nil {
+		out := append([]byte(dots.DotsConfigSchemaModeline), data...)
+		if err := d.Runtime.WriteFile(configPath, out, 0o644); err != nil {
 			return fmt.Errorf("write config: %w", err)
 		}
 
