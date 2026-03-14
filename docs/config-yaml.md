@@ -31,7 +31,7 @@ Core behavior settings.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `active_profile` | string | `""` | Currently active profile name |
+| `active_profile` | string | `""` | Currently active [profile](profiles.md) name |
 | `conflict_strategy` | string | `"prompt"` | How to handle file conflicts: `prompt`, `overwrite`, `skip`, `backup` |
 | `backup` | boolean | `true` | Back up existing files before overwriting |
 | `link_strategy` | string | `"symlink"` | Default link strategy: `symlink`, `copy`, `hardlink` |
