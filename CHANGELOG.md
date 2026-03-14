@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## v0.3.0 - 2026-03-14
+
+
+
+### Documentation
+- add user-facing documentation with structured docs/ directory
+
+
+### Features
+- add JSON schemas and modeline injection for YAML configs
+
+
 ## v0.2.1 - 2026-03-11
 
 
