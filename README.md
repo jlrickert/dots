@@ -168,20 +168,9 @@ platform:
       post_install: scripts/install-plugins.ps1
 ```
 
-Link targets use **path aliases** for cross-platform portability:
+Link targets use **path aliases** (`@config`, `@home`, `@data`, etc.) for cross-platform portability. Platform sections cascade in specificity order: **base -> OS -> OS-arch**.
 
-| Alias | macOS / Linux | Windows |
-|-------|---------------|---------|
-| `@home` | `$HOME` | `%USERPROFILE%` |
-| `@config` | `$XDG_CONFIG_HOME` (~/.config) | `%APPDATA%` |
-| `@data` | `$XDG_DATA_HOME` (~/.local/share) | `%LOCALAPPDATA%` |
-| `@cache` | `$XDG_CACHE_HOME` (~/.cache) | `%LOCALAPPDATA%\cache` |
-| `@state` | `$XDG_STATE_HOME` (~/.local/state) | `%LOCALAPPDATA%\state` |
-| `@bin` | `~/.local/bin` | `%LOCALAPPDATA%\bin` |
-
-Raw paths (without aliases) are relative to `$HOME` / `%USERPROFILE%`. Manifests always use forward slashes; dots normalizes to platform-native separators at resolution time.
-
-Platform sections cascade in specificity order: **base -> OS -> OS-arch**. Maps deep-merge, scalars replace.
+For the full manifest reference, see [Dotfile.yaml Reference](docs/dotfile-yaml.md).
 
 ## Link Strategy
 
@@ -193,14 +182,7 @@ dots supports three strategies, configurable globally, per-platform, or per-pack
 | `copy` | Copy source to target | No, run `dots sync` |
 | `hardlink` | Hardlink (same filesystem) | Instantly |
 
-When using `copy` strategy, use `dots sync` to push changes:
-
-```bash
-dots sync personal/nvim    # sync one package
-dots sync --all            # sync all copy-strategy packages
-```
-
-On Windows, dots auto-detects symlink capability and falls back to `copy` if unavailable.
+For details on each strategy, configuration hierarchy, and Windows auto-detection, see [Link Strategies](docs/link-strategies.md).
 
 ## Diagnostics
 
@@ -239,4 +221,21 @@ platform:
     link_strategy: copy
 ```
 
-For the full design specification, see [dots-design-v5.md](dots-design-v5.md).
+For the full configuration reference, see [config.yaml Reference](docs/config-yaml.md).
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Dotfile.yaml Reference](docs/dotfile-yaml.md) | Package manifest format, all fields, examples |
+| [config.yaml Reference](docs/config-yaml.md) | User configuration, defaults, platform overrides |
+| [Path Aliases](docs/path-aliases.md) | Built-in and custom path aliases, resolution rules |
+| [CLI Reference](docs/cli-reference.md) | All commands, flags, and usage examples |
+| [Platform System](docs/platform-system.md) | Platform detection, cascade resolution, merge rules |
+| [Link Strategies](docs/link-strategies.md) | symlink, copy, hardlink deep dive |
+| [Profiles](docs/profiles.md) | Profile system, inheritance, export/import |
+| [Overlays](docs/overlays.md) | Overlay system, merge strategies, priority |
+| [Work Mode](docs/work-mode.md) | Development workflow with local checkouts |
+| [Bootstrapping](docs/bootstrapping.md) | Self-bootstrapping and machine recovery |
+
+For the design specification, see [dots-design-v5.md](dots-design-v5.md).
