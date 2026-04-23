@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/jlrickert/dots/main/schemas/profile.json",
+  "title": "dots profile",
+  "description": "Schema for dots profile definitions (~/.config/dots/profiles/<name>.yaml)",
+  "type": "object",
+  "required": ["name"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Profile name (matches the file basename)"
+    },
+    "extends": {
+      "type": "string",
+      "description": "Parent profile name. The parent's packages are merged before this profile's packages, deduped."
+    },
+    "packages": {
+      "type": "array",
+      "description": "Package references (tap/package) to install when this profile is applied",
+      "items": { "type": "string" }
+    }
+  }
+}

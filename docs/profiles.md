@@ -55,6 +55,7 @@ dots profile show work     # show details of a profile
 A profile can inherit packages from a parent profile:
 
 ```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/profile.json
 name: work
 extends: base
 packages:
@@ -79,6 +80,7 @@ dots profile import work-profile.yaml
 ```
 
 This is useful for:
+
 - Sharing profiles between machines
 - Backing up profile definitions
 - Version-controlling profiles separately from taps
@@ -87,12 +89,14 @@ This is useful for:
 
 Profiles are stored as YAML files in the dots config directory under `profiles/`:
 
-| Platform | Path |
-|----------|------|
+| Platform      | Path                                  |
+| ------------- | ------------------------------------- |
 | macOS / Linux | `~/.config/dots/profiles/<name>.yaml` |
-| Windows | `%APPDATA%\dots\profiles\<name>.yaml` |
+| Windows       | `%APPDATA%\dots\profiles\<name>.yaml` |
 
 They are managed entirely through the `dots profile` commands — you don't need to edit profile files directly.
+
+When dots writes a profile, it prepends a `yaml-language-server` modeline pointing at `schemas/profile.json` so editors can offer schema validation and completion.
 
 ## Example Workflow
 

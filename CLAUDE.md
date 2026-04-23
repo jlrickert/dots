@@ -40,11 +40,13 @@ CLI command → pkg/cli (Cobra) → pkg/dotsctl.Dots → pkg/dots.Repository
 ```
 
 **Dots** (`pkg/dotsctl/dots.go`) is the root service struct composing:
+
 - `PathService` — platform-native directory resolution
 - `ConfigService` — cached config loading with defaults fallback
 - `Repository` — storage backend (MemoryRepo for tests, FsRepo for production)
 
 **Repository** (`pkg/dots/repository.go`) is the storage contract with:
+
 - `MemoryRepo` (`repo_memory.go`) — in-memory, thread-safe, used in tests
 - `FsRepo` (`repo_fs.go`) — filesystem-backed (skeleton, not yet implemented)
 
@@ -82,14 +84,14 @@ Config is loaded by `ConfigService` in `pkg/dotsctl/config_service.go`.
 
 ```yaml
 links:
-  init.lua: "@config/nvim/init.lua"     # base
+  init.lua: "@config/nvim/init.lua" # base
 platform:
   darwin:
     links:
-      clipboard.lua: "@config/nvim/lua/clipboard.lua"  # OS override
+      clipboard.lua: "@config/nvim/lua/clipboard.lua" # OS override
   darwin-arm64:
     links:
-      bin/nvim-arm: "@bin/nvim-silicon"  # OS-arch override
+      bin/nvim-arm: "@bin/nvim-silicon" # OS-arch override
 ```
 
 `dots.ResolveManifest(manifest, platform)` produces the effective manifest for the current platform.
@@ -117,9 +119,11 @@ platform:
 
 - `schemas/dotfile.json` — Draft 7 schema for `Dotfile.yaml` package manifests.
 - `schemas/dots-config.json` — Draft 7 schema for `config.yaml` user configuration.
-- Schema URL constants and modeline strings live in `pkg/dots/config.go` and `pkg/dots/manifest.go`.
-- `ConfigService.Save` and `dots init` prepend the `yaml-language-server` modeline to written config files.
-- When adding new fields to `Config` or `Manifest` structs, update the corresponding JSON Schema file to keep them in sync.
+- `schemas/profile.json` — Draft 7 schema for profile definitions in `~/.config/dots/profiles/<name>.yaml`.
+- Schema URL constants and modeline strings live in `pkg/dots/config.go`, `pkg/dots/manifest.go`, and `pkg/dots/profile.go`.
+- `ConfigService.Save` and `dots init` prepend the `yaml-language-server` modeline to written config files. `MarshalProfile` does the same for profiles, so all profile writers (`ProfileCreate`, `ProfileExport`, internal `saveProfile`) inherit it.
+- `DotfileSchemaModeline` is defined but not auto-injected — dots does not currently scaffold `Dotfile.yaml` files. Use it when adding such a command.
+- When adding new fields to `Config`, `Manifest`, or `Profile` structs, update the corresponding JSON Schema file to keep them in sync.
 
 ## Gotchas
 

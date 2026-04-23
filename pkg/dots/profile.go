@@ -6,6 +6,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	ProfileSchemaURL      = "https://raw.githubusercontent.com/jlrickert/dots/main/schemas/profile.json"
+	ProfileSchemaModeline = "# yaml-language-server: $schema=" + ProfileSchemaURL + "\n"
+)
+
 // Profile represents a named collection of packages.
 type Profile struct {
 	Name     string   `yaml:"name"`
@@ -25,7 +30,12 @@ func ParseProfile(data []byte) (*Profile, error) {
 	return &p, nil
 }
 
-// MarshalProfile serializes a Profile to YAML bytes.
+// MarshalProfile serializes a Profile to YAML bytes with the
+// yaml-language-server schema modeline prepended.
 func MarshalProfile(p *Profile) ([]byte, error) {
-	return yaml.Marshal(p)
+	data, err := yaml.Marshal(p)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(ProfileSchemaModeline), data...), nil
 }

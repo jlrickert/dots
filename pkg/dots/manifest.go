@@ -10,17 +10,20 @@ const (
 	// DotfileSchemaURL is the URL for the Dotfile.yaml JSON Schema.
 	DotfileSchemaURL = "https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json"
 	// DotfileSchemaModeline is the yaml-language-server modeline for Dotfile.yaml.
+	// Dots does not currently scaffold Dotfile.yaml files; this constant is the
+	// canonical string for any future package-scaffolding command and for
+	// authors hand-writing manifests.
 	DotfileSchemaModeline = "# yaml-language-server: $schema=" + DotfileSchemaURL + "\n"
 )
 
 // Manifest represents a parsed Dotfile.yaml package manifest.
 type Manifest struct {
-	Package  ManifestPackage           `yaml:"package"`
-	Links    map[string]string         `yaml:"links,omitempty"`
-	Hooks    ManifestHooks             `yaml:"hooks,omitempty"`
-	Overlay  *ManifestOverlay          `yaml:"overlay,omitempty"`
-	Merge    map[string]string         `yaml:"merge,omitempty"`
-	Platform map[string]PlatformBlock  `yaml:"platform,omitempty"`
+	Package  ManifestPackage          `yaml:"package"`
+	Links    map[string]string        `yaml:"links,omitempty"`
+	Hooks    ManifestHooks            `yaml:"hooks,omitempty"`
+	Overlay  *ManifestOverlay         `yaml:"overlay,omitempty"`
+	Merge    map[string]string        `yaml:"merge,omitempty"`
+	Platform map[string]PlatformBlock `yaml:"platform,omitempty"`
 }
 
 // ManifestPackage is the `package:` section of a manifest.
