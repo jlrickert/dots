@@ -51,6 +51,9 @@ func (d *Dots) Install(ctx context.Context, opts InstallOptions) (*InstallResult
 
 	// Resolve manifest for current platform
 	resolved := dots.ResolveManifest(manifest, platform)
+	if err := resolved.ResolveSelfRefs(tap); err != nil {
+		return nil, fmt.Errorf("resolve self refs: %w", err)
+	}
 
 	// Determine link strategy: flag > package manifest > global config > default
 	strategy := d.resolveStrategy(opts.Strategy, resolved.LinkStrategy)
@@ -246,4 +249,3 @@ func splitPackageRef(ref string) (string, string, error) {
 	}
 	return parts[0], parts[1], nil
 }
-

@@ -2,6 +2,7 @@ package dots
 
 import (
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,6 +15,11 @@ const (
 	// canonical string for any future package-scaffolding command and for
 	// authors hand-writing manifests.
 	DotfileSchemaModeline = "# yaml-language-server: $schema=" + DotfileSchemaURL + "\n"
+	// SelfTapPrefix is the pseudo-prefix that, in package refs inside a
+	// manifest (requires, overlay.base), resolves to the tap the manifest
+	// was loaded from. It lets authors write portable intra-tap references
+	// that don't depend on the consumer's tap alias.
+	SelfTapPrefix = "@self/"
 )
 
 // Manifest represents a parsed Dotfile.yaml package manifest.
@@ -181,6 +187,46 @@ func copyStringMap(m map[string]string) map[string]string {
 		cp[k] = v
 	}
 	return cp
+}
+
+// ResolveSelfRef rewrites a single package reference, expanding the
+// "@self/" pseudo-prefix to currentTap. Refs without the prefix pass through
+// unchanged. Using "@self/" with an empty currentTap is an error.
+func ResolveSelfRef(ref, currentTap string) (string, error) {
+	if !strings.HasPrefix(ref, SelfTapPrefix) {
+		return ref, nil
+	}
+	if currentTap == "" {
+		return "", fmt.Errorf("%w: cannot resolve %q without a current tap", ErrParse, ref)
+	}
+	return currentTap + "/" + strings.TrimPrefix(ref, SelfTapPrefix), nil
+}
+
+// ResolveSelfRefs rewrites "@self/" pseudo-prefixes in Requires and
+// Overlay.Base using currentTap. Safe to call more than once; non-self refs
+// pass through unchanged.
+func (r *ResolvedManifest) ResolveSelfRefs(currentTap string) error {
+	for i, ref := range r.Package.Requires {
+		resolved, err := ResolveSelfRef(ref, currentTap)
+		if err != nil {
+			return err
+		}
+		r.Package.Requires[i] = resolved
+	}
+	if r.Overlay != nil {
+		resolved, err := ResolveSelfRef(r.Overlay.Base, currentTap)
+		if err != nil {
+			return err
+		}
+		if resolved != r.Overlay.Base {
+			// Detach from the source manifest before mutating: ResolveManifest
+			// stores the *ManifestOverlay by pointer from the source Manifest.
+			clone := *r.Overlay
+			clone.Base = resolved
+			r.Overlay = &clone
+		}
+	}
+	return nil
 }
 
 func appendDedup(base, extra []string) []string {

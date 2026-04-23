@@ -46,6 +46,9 @@ func (d *Dots) Remove(ctx context.Context, opts RemoveOptions) error {
 		manifest, err := dots.ParseManifest(manifestData)
 		if err == nil {
 			resolved := dots.ResolveManifest(manifest, d.PathService.Platform)
+			if err := resolved.ResolveSelfRefs(tap); err != nil {
+				return fmt.Errorf("resolve self refs: %w", err)
+			}
 			hookRunner := d.hookRunner()
 			if err := hookRunner.RunHook(ctx, resolved.Hooks.PreRemove, pkgDir); err != nil {
 				return fmt.Errorf("pre_remove hook: %w", err)
@@ -72,6 +75,9 @@ func (d *Dots) Remove(ctx context.Context, opts RemoveOptions) error {
 		manifest, err := dots.ParseManifest(manifestData)
 		if err == nil {
 			resolved := dots.ResolveManifest(manifest, d.PathService.Platform)
+			if err := resolved.ResolveSelfRefs(tap); err != nil {
+				return fmt.Errorf("resolve self refs: %w", err)
+			}
 			hookRunner := d.hookRunner()
 			_ = hookRunner.RunHook(ctx, resolved.Hooks.PostRemove, pkgDir)
 		}

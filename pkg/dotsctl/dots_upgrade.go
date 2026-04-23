@@ -49,6 +49,9 @@ func (d *Dots) Upgrade(ctx context.Context, opts UpgradeOptions) error {
 	}
 
 	resolved := dots.ResolveManifest(manifest, d.PathService.Platform)
+	if err := resolved.ResolveSelfRefs(tap); err != nil {
+		return fmt.Errorf("resolve self refs: %w", err)
+	}
 	hookRunner := d.hookRunner()
 	if err := hookRunner.RunHook(ctx, resolved.Hooks.PreUpgrade, pkgDir); err != nil {
 		return fmt.Errorf("pre_upgrade hook: %w", err)

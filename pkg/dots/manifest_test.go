@@ -190,6 +190,90 @@ func TestResolveManifest_LinuxAmd64(t *testing.T) {
 	require.Equal(t, "scripts/install-plugins.sh", r.Hooks.PostInstall)
 }
 
+func TestResolveSelfRefs_Requires(t *testing.T) {
+	data := []byte(`
+package:
+  name: bash
+  requires:
+    - "@self/common-shell"
+    - personal/zsh
+
+platform:
+  darwin:
+    requires:
+      - "@self/mac-only"
+      - external/brew
+`)
+	m, err := dots.ParseManifest(data)
+	require.NoError(t, err)
+
+	r := dots.ResolveManifest(m, dots.Platform{OS: "darwin", Arch: "arm64"})
+	require.NoError(t, r.ResolveSelfRefs("jared"))
+
+	require.Equal(t, []string{
+		"jared/common-shell",
+		"personal/zsh",
+		"jared/mac-only",
+		"external/brew",
+	}, r.Package.Requires)
+}
+
+func TestResolveSelfRefs_OverlayBase(t *testing.T) {
+	data := []byte(`
+package:
+  name: bash-work
+
+overlay:
+  base: "@self/bash"
+  strategy: append
+  priority: 40
+`)
+	m, err := dots.ParseManifest(data)
+	require.NoError(t, err)
+
+	r := dots.ResolveManifest(m, dots.Platform{OS: "linux", Arch: "amd64"})
+	require.NoError(t, r.ResolveSelfRefs("jared"))
+
+	require.NotNil(t, r.Overlay)
+	require.Equal(t, "jared/bash", r.Overlay.Base)
+
+	// Mutation must not leak into the source manifest.
+	require.Equal(t, "@self/bash", m.Overlay.Base)
+}
+
+func TestResolveSelfRefs_Idempotent(t *testing.T) {
+	data := []byte(`
+package:
+  name: bash
+  requires: ["@self/common-shell", "other/pkg"]
+`)
+	m, err := dots.ParseManifest(data)
+	require.NoError(t, err)
+
+	r := dots.ResolveManifest(m, dots.Platform{OS: "linux", Arch: "amd64"})
+	require.NoError(t, r.ResolveSelfRefs("jared"))
+	require.NoError(t, r.ResolveSelfRefs("jared"))
+
+	require.Equal(t, []string{"jared/common-shell", "other/pkg"}, r.Package.Requires)
+}
+
+func TestResolveSelfRef_EmptyTap(t *testing.T) {
+	// Non-self refs pass through even when currentTap is empty.
+	ref, err := dots.ResolveSelfRef("personal/zsh", "")
+	require.NoError(t, err)
+	require.Equal(t, "personal/zsh", ref)
+
+	// Self refs require a current tap.
+	_, err = dots.ResolveSelfRef("@self/common-shell", "")
+	require.ErrorIs(t, err, dots.ErrParse)
+}
+
+func TestResolveSelfRef_NoPrefix(t *testing.T) {
+	ref, err := dots.ResolveSelfRef("personal/zsh", "jared")
+	require.NoError(t, err)
+	require.Equal(t, "personal/zsh", ref)
+}
+
 func TestResolveManifest_LinkStrategyOverride(t *testing.T) {
 	data := []byte(`
 package:

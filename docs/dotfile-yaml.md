@@ -32,15 +32,15 @@ Add this modeline as the first line of your `Dotfile.yaml` to enable autocomplet
 
 The `package` block contains metadata about the package. Only `name` is required.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | yes | Package name, used for identification and references |
-| `description` | string | no | Human-readable description |
-| `version` | string | no | Semantic version string (e.g. `1.0.0`) |
-| `requires` | string[] | no | Other packages this package depends on (e.g. `personal/zsh`) |
-| `tags` | string[] | no | Searchable tags for discovery (e.g. `[editor, neovim]`) |
-| `platforms` | string[] | no | Restrict installation to these platforms (e.g. `[darwin, linux-arm64]`) |
-| `link_strategy` | string | no | Override link strategy for this package: `symlink`, `copy`, or `hardlink` |
+| Field           | Type     | Required | Description                                                                                                                                                          |
+| --------------- | -------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`          | string   | yes      | Package name, used for identification and references                                                                                                                 |
+| `description`   | string   | no       | Human-readable description                                                                                                                                           |
+| `version`       | string   | no       | Semantic version string (e.g. `1.0.0`)                                                                                                                               |
+| `requires`      | string[] | no       | Other packages this package depends on. Each entry is `<tap>/<package>`, or `@self/<package>` to resolve to the same tap as this package (e.g. `@self/common-shell`) |
+| `tags`          | string[] | no       | Searchable tags for discovery (e.g. `[editor, neovim]`)                                                                                                              |
+| `platforms`     | string[] | no       | Restrict installation to these platforms (e.g. `[darwin, linux-arm64]`)                                                                                              |
+| `link_strategy` | string   | no       | Override link strategy for this package: `symlink`, `copy`, or `hardlink`                                                                                            |
 
 If `platforms` is set, the package will only install on a matching OS or OS-arch. An empty list (or omitted) means all platforms.
 
@@ -54,6 +54,19 @@ package:
   platforms: [darwin, linux]
   link_strategy: symlink
 ```
+
+### Same-tap references with `@self/`
+
+Intra-tap dependencies should use the `@self/` pseudo-prefix so the reference is portable across consumer-chosen tap aliases:
+
+```yaml
+package:
+  name: bash
+  requires:
+    - "@self/common-shell" # resolves to '<this-tap>/common-shell'
+```
+
+At resolution time dots rewrites `@self/<package>` to `<current-tap>/<package>`. The current tap is the tap the manifest was loaded from. Cross-tap dependencies keep the explicit `<tap>/<package>` form.
 
 ## `links` Block
 
@@ -88,14 +101,14 @@ links:
 
 Hooks are lifecycle scripts that run at specific points during package operations. Each hook is either a path to a script file (relative to the package directory) or an inline shell command.
 
-| Hook | When it runs |
-|------|-------------|
-| `pre_install` | Before files are linked |
-| `post_install` | After files are linked |
-| `pre_remove` | Before files are unlinked |
-| `post_remove` | After files are unlinked |
-| `pre_upgrade` | Before upgrade (after tap update) |
-| `post_upgrade` | After upgrade completes |
+| Hook           | When it runs                      |
+| -------------- | --------------------------------- |
+| `pre_install`  | Before files are linked           |
+| `post_install` | After files are linked            |
+| `pre_remove`   | Before files are unlinked         |
+| `post_remove`  | After files are unlinked          |
+| `pre_upgrade`  | Before upgrade (after tap update) |
+| `post_upgrade` | After upgrade completes           |
 
 ```yaml
 hooks:
@@ -114,11 +127,11 @@ dots determines which form you're using by checking whether the value resolves t
 
 For script files, the shell is chosen by file extension:
 
-| Extension | Shell | Platform |
-|-----------|-------|----------|
-| `.ps1` | `powershell.exe -ExecutionPolicy Bypass -File` | Windows |
-| `.cmd`, `.bat` | `cmd.exe /C` | Windows |
-| All others | `$SHELL` (fallback: `/bin/sh`) | Unix |
+| Extension      | Shell                                          | Platform |
+| -------------- | ---------------------------------------------- | -------- |
+| `.ps1`         | `powershell.exe -ExecutionPolicy Bypass -File` | Windows  |
+| `.cmd`, `.bat` | `cmd.exe /C`                                   | Windows  |
+| All others     | `$SHELL` (fallback: `/bin/sh`)                 | Unix     |
 
 For inline commands, `$SHELL -c` is used on Unix and `cmd.exe` on Windows.
 
@@ -126,8 +139,8 @@ For inline commands, `$SHELL -c` is used on Unix and `cmd.exe` on Windows.
 
 All hooks receive:
 
-| Variable | Value |
-|----------|-------|
+| Variable           | Value                                  |
+| ------------------ | -------------------------------------- |
 | `DOTS_PACKAGE_DIR` | Absolute path to the package directory |
 
 The working directory is set to the package directory.
@@ -143,11 +156,11 @@ overlay:
   priority: 50
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `base` | string | yes | Base package reference (`tap/package`) |
-| `strategy` | string | no | Merge strategy: `append` (default), `prepend`, `replace`, `merge` |
-| `priority` | integer | no | Priority 0-99, higher wins when multiple overlays target the same base |
+| Field      | Type    | Required | Description                                                             |
+| ---------- | ------- | -------- | ----------------------------------------------------------------------- |
+| `base`     | string  | yes      | Base package reference (`tap/package`, or `@self/package` for same-tap) |
+| `strategy` | string  | no       | Merge strategy: `append` (default), `prepend`, `replace`, `merge`       |
+| `priority` | integer | no       | Priority 0-99, higher wins when multiple overlays target the same base  |
 
 See [Overlays](overlays.md) for a detailed guide on merge strategies.
 
@@ -173,30 +186,30 @@ The `platform` block contains OS-specific and OS-arch-specific overrides. Keys a
 
 ### Platform Identifiers
 
-| Key | Matches |
-|-----|---------|
-| `darwin` | macOS (any architecture) |
-| `linux` | Linux (any architecture) |
-| `windows` | Windows (any architecture) |
-| `freebsd` | FreeBSD (any architecture) |
-| `darwin-arm64` | macOS on Apple Silicon |
-| `darwin-amd64` | macOS on Intel |
-| `linux-amd64` | Linux on x86_64 |
-| `linux-arm64` | Linux on ARM64 |
+| Key            | Matches                    |
+| -------------- | -------------------------- |
+| `darwin`       | macOS (any architecture)   |
+| `linux`        | Linux (any architecture)   |
+| `windows`      | Windows (any architecture) |
+| `freebsd`      | FreeBSD (any architecture) |
+| `darwin-arm64` | macOS on Apple Silicon     |
+| `darwin-amd64` | macOS on Intel             |
+| `linux-amd64`  | Linux on x86_64            |
+| `linux-arm64`  | Linux on ARM64             |
 
 ### What Can Be Overridden
 
 Each platform block can contain:
 
-| Field | Merge behavior |
-|-------|---------------|
-| `links` | Maps merge (new keys added, existing keys replaced) |
-| `hooks` | Non-empty hooks replace base hooks |
-| `requires` | Lists concatenate with deduplication |
-| `tags` | Lists concatenate with deduplication |
-| `overlay` | Replaces entirely |
-| `merge` | Maps merge (per-file overrides added/replaced) |
-| `link_strategy` | Replaces |
+| Field           | Merge behavior                                      |
+| --------------- | --------------------------------------------------- |
+| `links`         | Maps merge (new keys added, existing keys replaced) |
+| `hooks`         | Non-empty hooks replace base hooks                  |
+| `requires`      | Lists concatenate with deduplication                |
+| `tags`          | Lists concatenate with deduplication                |
+| `overlay`       | Replaces entirely                                   |
+| `merge`         | Maps merge (per-file overrides added/replaced)      |
+| `link_strategy` | Replaces                                            |
 
 ### Cascade Resolution
 

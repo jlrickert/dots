@@ -36,6 +36,9 @@ func (d *Dots) Info(ctx context.Context, pkgRef string) (*InfoResult, error) {
 		manifest, err := dots.ParseManifest(manifestData)
 		if err == nil {
 			resolved := dots.ResolveManifest(manifest, d.PathService.Platform)
+			if err := resolved.ResolveSelfRefs(tap); err != nil {
+				return nil, fmt.Errorf("resolve self refs: %w", err)
+			}
 			result.Manifest = resolved
 			result.Version = resolved.Package.Version
 		}

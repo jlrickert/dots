@@ -27,7 +27,7 @@
         },
         "requires": {
           "type": "array",
-          "description": "Other packages this package depends on",
+          "description": "Other packages this package depends on. Each entry is a '<tap>/<package>' ref, or '@self/<package>' to resolve to the current package's tap (portable intra-tap references).",
           "items": { "type": "string" }
         },
         "tags": {
@@ -117,7 +117,7 @@
       "properties": {
         "base": {
           "type": "string",
-          "description": "Base package reference (tap/package)"
+          "description": "Base package reference ('<tap>/<package>' or '@self/<package>' to resolve to the current package's tap)"
         },
         "strategy": {
           "type": "string",
