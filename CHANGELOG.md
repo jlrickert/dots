@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## v0.4.0 - 2026-04-24
+
+
+
+### Bug Fixes
+- expand leading tilde in dotfile link destinations
+
+
+### Documentation
+- add cross-reference from config-yaml to profiles page
+- add feature status table to README
+
+
+### Features
+- add profile JSON schema and modeline injection
+- add @self/ pseudo-prefix for intra-tap package refs
+- init --name flag, copy default, work-mode symlinks, tap remove cascade
+
+
 ## v0.3.0 - 2026-03-14
 
 
