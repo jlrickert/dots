@@ -52,7 +52,7 @@ func DefaultConfig() Config {
 		Core: CoreConfig{
 			ConflictStrategy: "prompt",
 			Backup:           &backupTrue,
-			LinkStrategy:     LinkSymlink,
+			LinkStrategy:     LinkCopy,
 		},
 		Git: GitConfig{
 			DefaultBranch: "main",

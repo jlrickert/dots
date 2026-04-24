@@ -6,13 +6,13 @@ Complete reference for all `dots` commands, flags, and subcommands.
 
 These flags are available on every command:
 
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--config` | `-c` | (auto-detect) | Path to config file |
-| `--log-file` | | stderr | Write logs to file |
-| `--log-level` | | `info` | Minimum log level |
-| `--log-json` | | `false` | Output logs as JSON |
-| `--version` | | | Show version |
+| Flag          | Short | Default       | Description         |
+| ------------- | ----- | ------------- | ------------------- |
+| `--config`    | `-c`  | (auto-detect) | Path to config file |
+| `--log-file`  |       | stderr        | Write logs to file  |
+| `--log-level` |       | `info`        | Minimum log level   |
+| `--log-json`  |       | `false`       | Output logs as JSON |
+| `--version`   |       |               | Show version        |
 
 ## Initialization
 
@@ -23,14 +23,26 @@ Initialize the dots environment. Creates a default config file if one doesn't ex
 ```bash
 dots init
 dots init --from git@github.com:you/dotfiles.git --path dots
+dots init --from git@github.com:you/dot-personal.git --name private --path dots-config
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--from` | Git URL to clone as initial tap |
-| `--path` | Package path within the tap to install |
+| Flag     | Description                                                                                                                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--from` | Git URL to clone as initial tap                                                                                                                                                           |
+| `--path` | Package path within the tap to install                                                                                                                                                    |
+| `--name` | Tap name for the `--from` clone (default: `default`). Set this to match the tap name declared in the bootstrap package's `config.yaml` so the on-disk tap and the installed config agree. |
 
 When `--from` is specified, dots clones the repo as a tap and installs the package at `--path` from it.
+
+If the bootstrap package (the one at `--path`) ships a `config.yaml` that declares the same repo as a named tap (e.g. `taps.private.url` matching `--from`), pass `--name private` so dots registers the clone under `private` rather than the generic `default`. Otherwise dots ends up with two taps — `default` and `private` — pointing at the same URL.
+
+### Cleaning up a duplicate tap
+
+If a prior `dots init --from <URL> --path <pkg>` left a stale `default` tap next to the name declared in the installed config, remove the orphan:
+
+```bash
+dots tap remove default
+```
 
 ## Tap Management
 
@@ -43,13 +55,15 @@ dots tap add personal git@github.com:you/dotfiles.git
 dots tap add work git@github.com:company/dotfiles.git --branch develop
 ```
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--branch` | `main` | Git branch to track |
+| Flag       | Default | Description         |
+| ---------- | ------- | ------------------- |
+| `--branch` | `main`  | Git branch to track |
 
 ### `dots tap remove`
 
 Remove a registered tap. Aliases: `rm`.
+
+Any packages installed from the tap are uninstalled first (links and lockfile entries removed). If the on-disk tap directory is already gone, lockfile entries are still cleaned up — use this to reconcile a tap whose state has drifted.
 
 ```bash
 dots tap remove personal
@@ -86,9 +100,9 @@ dots install personal/nvim --dry-run
 dots install personal/nvim --strategy copy
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--dry-run` | Print what would happen without writing |
+| Flag         | Description                                           |
+| ------------ | ----------------------------------------------------- |
+| `--dry-run`  | Print what would happen without writing               |
 | `--strategy` | Override link strategy: `symlink`, `copy`, `hardlink` |
 
 ### `dots remove`
@@ -108,8 +122,8 @@ dots upgrade personal/nvim   # upgrade one package
 dots upgrade --all           # upgrade all installed packages
 ```
 
-| Flag | Description |
-|------|-------------|
+| Flag    | Description                    |
+| ------- | ------------------------------ |
 | `--all` | Upgrade all installed packages |
 
 ### `dots reinstall`
@@ -129,8 +143,8 @@ dots sync personal/nvim      # sync one package
 dots sync --all              # sync all copy-strategy packages
 ```
 
-| Flag | Description |
-|------|-------------|
+| Flag    | Description                     |
+| ------- | ------------------------------- |
 | `--all` | Sync all copy-strategy packages |
 
 ## Discovery
@@ -145,10 +159,10 @@ dots list --available        # list available (uninstalled) packages
 dots list --tap personal     # filter by tap
 ```
 
-| Flag | Description |
-|------|-------------|
+| Flag          | Description                             |
+| ------------- | --------------------------------------- |
 | `--available` | List available (not installed) packages |
-| `--tap` | Filter by tap name |
+| `--tap`       | Filter by tap name                      |
 
 ### `dots search`
 
@@ -179,8 +193,8 @@ dots info personal/nvim      # package details
 dots info --platform         # current platform
 ```
 
-| Flag | Description |
-|------|-------------|
+| Flag         | Description                                |
+| ------------ | ------------------------------------------ |
 | `--platform` | Show platform info instead of package info |
 
 ## Inspection

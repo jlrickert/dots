@@ -1,6 +1,8 @@
 # Work Mode
 
-Work mode lets you develop dotfile packages by pointing dots at a local Git checkout instead of its internal clone. This way, edits to your local repo are immediately reflected in your installed dotfiles (when using symlink strategy).
+Work mode lets you develop dotfile packages by pointing dots at a local Git checkout instead of its internal clone. Edits to your local repo are immediately reflected in your installed dotfiles.
+
+When a tap is in work mode, the default link strategy for that tap's packages becomes `symlink` (instead of the global default of `copy`) so edits propagate without running `dots sync`. Per-package `link_strategy` in `Dotfile.yaml` and the install-time `--strategy` flag still win over this default. See [Link Strategies](link-strategies.md#configuration-hierarchy) for the full precedence order.
 
 ## Typical Workflow
 
@@ -73,11 +75,11 @@ Rebuild is needed when you change the `links` section of a Dotfile.yaml in your 
 
 ## Behavior by Link Strategy
 
-| Strategy | Effect in work mode |
-|----------|-------------------|
-| `symlink` | Symlinks point to local checkout — edits propagate instantly |
-| `hardlink` | Hard links to local files — edits propagate instantly |
-| `copy` | Files were copied at install time — use `dots sync` to update |
+| Strategy   | Effect in work mode                                           |
+| ---------- | ------------------------------------------------------------- |
+| `symlink`  | Symlinks point to local checkout — edits propagate instantly  |
+| `hardlink` | Hard links to local files — edits propagate instantly         |
+| `copy`     | Files were copied at install time — use `dots sync` to update |
 
 For the best work mode experience, use `symlink` strategy so changes are reflected immediately without any sync step.
 

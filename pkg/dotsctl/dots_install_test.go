@@ -95,6 +95,69 @@ func TestInstall_InvalidRef(t *testing.T) {
 	require.Contains(t, err.Error(), "invalid package reference")
 }
 
+func TestInstall_DefaultStrategyIsCopy(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+
+	seedPackage(t, d, repo, "personal", "testpkg")
+
+	result, err := d.Install(ctx, dotsctl.InstallOptions{Package: "personal/testpkg"})
+	require.NoError(t, err)
+	require.Equal(t, "copy", result.Files[0].Method)
+}
+
+// seedWorkModePackage writes a package to a real filesystem path and enables
+// work_mode for the tap pointing at it. Mirrors what `dots work on` produces in
+// production: a tap pointing at a user checkout that lives outside dots' own
+// state directory.
+func seedWorkModePackage(t *testing.T, d *dotsctl.Dots, repo *dots.MemoryRepo, tap, pkg string, manifest []byte) string {
+	t.Helper()
+	ctx := context.Background()
+	require.NoError(t, repo.AddTap(ctx, dots.TapInfo{Name: tap, URL: "test"}))
+
+	workDir := filepath.Join(t.TempDir(), "checkout")
+	pkgDir := filepath.Join(workDir, pkg)
+	require.NoError(t, os.MkdirAll(pkgDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "Dotfile.yaml"), manifest, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "testfile"), []byte("content"), 0o644))
+	require.NoError(t, repo.AddPackage(tap, dots.PackageInfo{Tap: tap, Name: pkg, Dir: pkg}, manifest))
+
+	cfg, err := d.ConfigService.Config(false)
+	require.NoError(t, err)
+	if cfg.WorkMode == nil {
+		cfg.WorkMode = map[string]string{}
+	}
+	cfg.WorkMode[tap] = workDir
+	require.NoError(t, d.ConfigService.Save(cfg))
+
+	return pkgDir
+}
+
+func TestInstall_WorkModeUsesSymlink(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+
+	manifest := []byte("package:\n  name: testpkg\nlinks:\n  testfile: \"@config/testpkg/testfile\"\n")
+	seedWorkModePackage(t, d, repo, "personal", "testpkg", manifest)
+
+	result, err := d.Install(ctx, dotsctl.InstallOptions{Package: "personal/testpkg"})
+	require.NoError(t, err)
+	require.Equal(t, "symlink", result.Files[0].Method)
+}
+
+func TestInstall_ManifestOverridesWorkMode(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+
+	// Manifest forces copy — should win over the work-mode default of symlink.
+	manifest := []byte("package:\n  name: testpkg\n  link_strategy: copy\nlinks:\n  testfile: \"@config/testpkg/testfile\"\n")
+	seedWorkModePackage(t, d, repo, "personal", "testpkg", manifest)
+
+	result, err := d.Install(ctx, dotsctl.InstallOptions{Package: "personal/testpkg"})
+	require.NoError(t, err)
+	require.Equal(t, "copy", result.Files[0].Method, "manifest link_strategy must win over work-mode default")
+}
+
 func TestInstall_CopyStrategy(t *testing.T) {
 	d, repo := newTestDots(t)
 	ctx := context.Background()

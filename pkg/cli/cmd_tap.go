@@ -67,11 +67,24 @@ func newTapRemoveCmd(deps *Deps) *cobra.Command {
 				return err
 			}
 
-			if err := d.TapRemove(cmd.Context(), args[0]); err != nil {
+			result, err := d.TapRemove(cmd.Context(), args[0])
+			out := cmd.OutOrStdout()
+			if result != nil {
+				for _, ref := range result.Uninstalled {
+					fmt.Fprintf(out, "Uninstalled %s\n", ref)
+				}
+				for _, ref := range result.Failed {
+					fmt.Fprintf(out, "Failed to uninstall %s\n", ref)
+				}
+			}
+			if err != nil {
 				return err
 			}
-
-			fmt.Fprintf(cmd.OutOrStdout(), "Removed tap %s\n", args[0])
+			if result != nil && !result.TapExisted {
+				fmt.Fprintf(out, "Cleaned up orphan lockfile entries for tap %s\n", args[0])
+			} else {
+				fmt.Fprintf(out, "Removed tap %s\n", args[0])
+			}
 			return nil
 		},
 	}

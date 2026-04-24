@@ -133,7 +133,7 @@ func TestStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, result.TapCount)
 	require.Equal(t, 0, result.PackageCount)
-	require.Equal(t, dots.LinkSymlink, result.LinkStrategy)
+	require.Equal(t, dots.LinkCopy, result.LinkStrategy)
 }
 
 // --- Init ---
@@ -158,6 +158,24 @@ func TestInit_WithFrom(t *testing.T) {
 	tap, err := repo.GetTap(ctx, "default")
 	require.NoError(t, err)
 	require.Equal(t, "git@github.com:me/dotfiles.git", tap.URL)
+}
+
+func TestInit_WithFromAndName(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+
+	err := d.Init(ctx, dotsctl.InitOptions{
+		From: "git@github.com:jlrickert/dot-personal.git",
+		Name: "private",
+	})
+	require.NoError(t, err)
+
+	tap, err := repo.GetTap(ctx, "private")
+	require.NoError(t, err)
+	require.Equal(t, "git@github.com:jlrickert/dot-personal.git", tap.URL)
+
+	_, err = repo.GetTap(ctx, "default")
+	require.Error(t, err, "default tap should not be created when --name is set")
 }
 
 // --- Doctor ---

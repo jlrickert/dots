@@ -14,7 +14,14 @@ type InitOptions struct {
 	From string
 	// Path is the package directory within the tap containing the dots config.
 	Path string
+	// Name is the tap name to register the --from clone under. Empty means "default".
+	// Set this to match the tap name declared in the bootstrap package's config
+	// so the on-disk tap and the installed config.yaml agree.
+	Name string
 }
+
+// defaultTapName is the tap name used when --name is not supplied.
+const defaultTapName = "default"
 
 // Init initializes the dots environment: creates config and state directories,
 // writes a default config, and optionally registers an initial tap.
@@ -42,12 +49,17 @@ func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 		return fmt.Errorf("create taps dir: %w", err)
 	}
 
+	tapName := opts.Name
+	if tapName == "" {
+		tapName = defaultTapName
+	}
+
 	// Write default config if none exists.
 	configPath := d.ConfigService.ConfigPath
 	if _, err := d.Runtime.Stat(configPath, true); err != nil {
 		cfg := dots.DefaultConfig()
 		if opts.From != "" {
-			cfg.Taps["default"] = dots.TapConfig{
+			cfg.Taps[tapName] = dots.TapConfig{
 				URL: opts.From,
 			}
 		}
@@ -66,7 +78,6 @@ func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 
 	// Register the initial tap if --from is provided.
 	if opts.From != "" {
-		tapName := "default"
 		err := d.Repo.AddTap(ctx, dots.TapInfo{
 			Name: tapName,
 			URL:  opts.From,

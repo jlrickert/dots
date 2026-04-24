@@ -91,8 +91,8 @@ func TestMergeConfig(t *testing.T) {
 
 	result := dots.MergeConfig(&base, override)
 	require.Equal(t, "work", result.Core.ActiveProfile)
-	require.Equal(t, dots.LinkSymlink, result.Core.LinkStrategy)  // from base default
-	require.Equal(t, "main", result.Git.DefaultBranch)            // from base default
+	require.Equal(t, dots.LinkCopy, result.Core.LinkStrategy) // from base default
+	require.Equal(t, "main", result.Git.DefaultBranch)        // from base default
 	require.Equal(t, "git@github.com:corp/dotfiles.git", result.Taps["work"].URL)
 	require.Equal(t, "@config/work", result.Aliases["@work"])
 }
@@ -100,13 +100,13 @@ func TestMergeConfig(t *testing.T) {
 func TestConfig_ResolveCorePlatform(t *testing.T) {
 	cfg := dots.DefaultConfig()
 	cfg.Platform = map[string]dots.CoreConfig{
-		"windows": {LinkStrategy: dots.LinkCopy},
+		"windows":      {LinkStrategy: dots.LinkCopy},
 		"darwin-arm64": {LinkStrategy: dots.LinkHardlink},
 	}
 
 	t.Run("no platform match", func(t *testing.T) {
 		core := cfg.ResolveCorePlatform(dots.Platform{OS: "linux", Arch: "amd64"})
-		require.Equal(t, dots.LinkSymlink, core.LinkStrategy)
+		require.Equal(t, dots.LinkCopy, core.LinkStrategy)
 	})
 
 	t.Run("OS match", func(t *testing.T) {

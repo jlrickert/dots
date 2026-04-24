@@ -22,6 +22,7 @@ func newInitCmd(deps *Deps) *cobra.Command {
 
 	cmd.Flags().StringVar(&opts.From, "from", "", "Git URL to clone as initial tap")
 	cmd.Flags().StringVar(&opts.Path, "path", "", "Package path within the tap")
+	cmd.Flags().StringVar(&opts.Name, "name", "", "Tap name for --from clone (default: \"default\"). Set this to match the tap declared in the bootstrap package's config to avoid a duplicate tap entry.")
 
 	return cmd
 }

@@ -3,6 +3,7 @@ package dotsctl
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -55,8 +56,8 @@ func (d *Dots) Install(ctx context.Context, opts InstallOptions) (*InstallResult
 		return nil, fmt.Errorf("resolve self refs: %w", err)
 	}
 
-	// Determine link strategy: flag > package manifest > global config > default
-	strategy := d.resolveStrategy(opts.Strategy, resolved.LinkStrategy)
+	// Determine link strategy: flag > package manifest > work mode > global config > default
+	strategy := d.resolveStrategy(tap, opts.Strategy, resolved.LinkStrategy)
 
 	// Resolve link actions
 	pkgDir := d.packageDir(tap, pkg)
@@ -179,7 +180,11 @@ func (d *Dots) recordInstall(
 	return d.Repo.WriteLockfile(ctx, lockfile)
 }
 
-func (d *Dots) resolveStrategy(override, pkgStrategy dots.LinkStrategy) dots.LinkStrategy {
+// resolveStrategy picks the link strategy for a tap install.
+// Precedence: explicit override > package manifest > work mode > config > default.
+// Work mode is treated as "live editing" — when the tap is in work mode, default
+// to symlink so edits in the local checkout propagate without `dots sync`.
+func (d *Dots) resolveStrategy(tap string, override, pkgStrategy dots.LinkStrategy) dots.LinkStrategy {
 	if override != "" {
 		return override
 	}
@@ -188,21 +193,27 @@ func (d *Dots) resolveStrategy(override, pkgStrategy dots.LinkStrategy) dots.Lin
 	}
 	cfg, _ := d.ConfigService.Config(true)
 	if cfg != nil {
+		if _, ok := cfg.WorkMode[tap]; ok {
+			return dots.LinkSymlink
+		}
 		core := cfg.ResolveCorePlatform(d.PathService.Platform)
 		if core.LinkStrategy != "" {
 			return core.LinkStrategy
 		}
 	}
-	return dots.LinkSymlink
+	return dots.LinkCopy
 }
 
 // readManifest reads a package manifest, checking work mode paths first.
+// Work mode paths are real user-filesystem paths (from `dots work on <tap> <path>`)
+// and must be read directly via os.ReadFile — the runtime's jail applies only to
+// dots-managed state, not to arbitrary checkouts the user has declared.
 func (d *Dots) readManifest(ctx context.Context, tap, pkg string) ([]byte, error) {
 	cfg, _ := d.ConfigService.Config(true)
 	if cfg != nil {
 		if localPath, ok := cfg.WorkMode[tap]; ok {
 			manifestPath := localPath + "/" + pkg + "/Dotfile.yaml"
-			data, err := d.Runtime.ReadFile(manifestPath)
+			data, err := os.ReadFile(manifestPath)
 			if err != nil {
 				return nil, &dots.PackageNotFoundError{Tap: tap, Package: pkg}
 			}

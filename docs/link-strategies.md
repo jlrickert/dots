@@ -4,21 +4,22 @@ dots supports three strategies for placing configuration files from a tap packag
 
 ## Overview
 
-| Strategy | Mechanism | Edits propagate? | Cross-filesystem? |
-|----------|-----------|-------------------|--------------------|
-| `symlink` (default) | Symbolic link from target to source | Instantly | Yes |
-| `copy` | Independent copy of source to target | No (use `dots sync`) | Yes |
-| `hardlink` | Hard link (same inode) | Instantly | No (same filesystem only) |
+| Strategy         | Mechanism                            | Edits propagate?     | Cross-filesystem?         |
+| ---------------- | ------------------------------------ | -------------------- | ------------------------- |
+| `copy` (default) | Independent copy of source to target | No (use `dots sync`) | Yes                       |
+| `symlink`        | Symbolic link from target to source  | Instantly            | Yes                       |
+| `hardlink`       | Hard link (same inode)               | Instantly            | No (same filesystem only) |
 
 ## Configuration Hierarchy
 
 The effective link strategy for a package is determined by the first match in this priority order:
 
-1. **Per-package** (`link_strategy` in the `package` block of Dotfile.yaml)
-2. **Install-time override** (`dots install --strategy copy`)
-3. **Platform config** (`platform` section of config.yaml)
-4. **Global config** (`core.link_strategy` in config.yaml)
-5. **Default** (`symlink`)
+1. **Install-time override** (`dots install --strategy copy`)
+2. **Per-package** (`link_strategy` in the `package` block of Dotfile.yaml)
+3. **Work mode** — if the package's tap is in work mode (`dots work on <tap> <path>`), the strategy defaults to `symlink` so edits in the local checkout propagate without `dots sync`.
+4. **Platform config** (`platform` section of config.yaml)
+5. **Global config** (`core.link_strategy` in config.yaml)
+6. **Default** (`copy`)
 
 ## Symlink
 
@@ -34,6 +35,7 @@ Creates a symbolic link at the target path pointing to the source file in the ta
 ```
 
 **Characteristics:**
+
 - Edits to the target file immediately affect the source (they're the same file)
 - Works across filesystems and partitions
 - Visible as a symlink in `ls -la`
@@ -54,6 +56,7 @@ Creates an independent copy of the source file at the target location. dots reco
 ```
 
 **Characteristics:**
+
 - Target is a standalone file, not linked to the source
 - Edits to the target do **not** propagate back to the source
 - Use `dots sync` to push source changes to installed copies
@@ -83,6 +86,7 @@ Creates a hard link (shared inode) between the source and target.
 ```
 
 **Characteristics:**
+
 - Edits propagate instantly (same underlying file data)
 - Not visible as a link in `ls -la` (looks like a regular file)
 - Both files must be on the **same filesystem** — fails if source and target are on different partitions
@@ -107,19 +111,19 @@ When `core.backup` is `true` (the default) and a file already exists at the targ
 
 The `core.conflict_strategy` setting controls what happens when a conflict is detected:
 
-| Strategy | Behavior |
-|----------|----------|
-| `prompt` | Ask the user what to do |
-| `overwrite` | Replace the existing file |
-| `skip` | Leave the existing file in place |
-| `backup` | Back up the existing file, then replace |
+| Strategy    | Behavior                                |
+| ----------- | --------------------------------------- |
+| `prompt`    | Ask the user what to do                 |
+| `overwrite` | Replace the existing file               |
+| `skip`      | Leave the existing file in place        |
+| `backup`    | Back up the existing file, then replace |
 
 ## Choosing a Strategy
 
-| Use case | Recommended strategy |
-|----------|---------------------|
-| Development (frequent edits) | `symlink` |
-| Shared/restricted machines | `copy` |
-| Same-filesystem, invisible links | `hardlink` |
-| Windows without developer mode | `copy` |
-| CI/deployment | `copy` |
+| Use case                         | Recommended strategy |
+| -------------------------------- | -------------------- |
+| Development (frequent edits)     | `symlink`            |
+| Shared/restricted machines       | `copy`               |
+| Same-filesystem, invisible links | `hardlink`           |
+| Windows without developer mode   | `copy`               |
+| CI/deployment                    | `copy`               |
