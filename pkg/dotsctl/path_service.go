@@ -20,7 +20,7 @@ type platform = dots.Platform
 func NewPathService(p dots.Platform, rt *toolkit.Runtime) *PathService {
 	return &PathService{
 		Platform: p,
-		Resolver: dots.NewAliasResolver(p, rt.Get),
+		Resolver: dots.NewAliasResolver(p, rt),
 		runtime:  rt,
 	}
 }

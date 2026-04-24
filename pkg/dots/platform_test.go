@@ -4,6 +4,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/jlrickert/cli-toolkit/toolkit"
 	"github.com/jlrickert/dots/pkg/dots"
 	"github.com/stretchr/testify/require"
 )
@@ -15,10 +16,33 @@ func TestDetectPlatform(t *testing.T) {
 	require.Equal(t, runtime.GOOS+"-"+runtime.GOARCH, p.String())
 }
 
-func testEnv(vals map[string]string) func(string) string {
-	return func(key string) string {
-		return vals[key]
+// mapEnv is a minimal toolkit.Env backed by a map. Only Get and GetHome
+// carry meaningful behavior; other methods exist to satisfy the interface.
+type mapEnv map[string]string
+
+func (m mapEnv) Name() string              { return "mapEnv" }
+func (m mapEnv) GetJail() string           { return "" }
+func (m mapEnv) SetJail(string) error      { return nil }
+func (m mapEnv) Get(key string) string     { return m[key] }
+func (m mapEnv) Set(key, val string) error { m[key] = val; return nil }
+func (m mapEnv) Has(key string) bool       { _, ok := m[key]; return ok }
+func (m mapEnv) Environ() []string         { return nil }
+func (m mapEnv) Unset(key string)          { delete(m, key) }
+func (m mapEnv) GetHome() (string, error) {
+	if v := m["USERPROFILE"]; v != "" {
+		return v, nil
 	}
+	return m["HOME"], nil
+}
+func (m mapEnv) SetHome(h string) error   { m["HOME"] = h; return nil }
+func (m mapEnv) GetUser() (string, error) { return m["USER"], nil }
+func (m mapEnv) SetUser(u string) error   { m["USER"] = u; return nil }
+func (m mapEnv) Getwd() (string, error)   { return m["PWD"], nil }
+func (m mapEnv) Setwd(d string) error     { m["PWD"] = d; return nil }
+func (m mapEnv) GetTempDir() string       { return m["TMPDIR"] }
+
+func testEnv(vals map[string]string) toolkit.Env {
+	return mapEnv(vals)
 }
 
 func TestAliasResolver_Unix(t *testing.T) {
@@ -39,6 +63,8 @@ func TestAliasResolver_Unix(t *testing.T) {
 		{"bin default", "@bin", "/home/user/.local/bin"},
 		{"config subpath", "@config/nvim/init.lua", "/home/user/.config/nvim/init.lua"},
 		{"raw path", ".gitconfig", "/home/user/.gitconfig"},
+		{"tilde alone", "~", "/home/user"},
+		{"tilde subpath", "~/Library/LaunchAgents/foo.plist", "/home/user/Library/LaunchAgents/foo.plist"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

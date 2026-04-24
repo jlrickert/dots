@@ -108,12 +108,7 @@ func TestResolveLinkActions(t *testing.T) {
 
 	resolver := dots.NewAliasResolver(
 		dots.Platform{OS: "linux", Arch: "amd64"},
-		func(key string) string {
-			if key == "HOME" {
-				return filepath.Join(dir, "home")
-			}
-			return ""
-		},
+		mapEnv{"HOME": filepath.Join(dir, "home")},
 	)
 
 	resolved := &dots.ResolvedManifest{

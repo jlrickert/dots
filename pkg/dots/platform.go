@@ -2,10 +2,11 @@ package dots
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/jlrickert/cli-toolkit/toolkit"
 )
 
 // Platform represents an OS-architecture pair (e.g. "darwin-arm64").
@@ -48,15 +49,15 @@ var BuiltinAliases = []Alias{
 // AliasResolver resolves path aliases to absolute paths for a given platform.
 type AliasResolver struct {
 	platform Platform
-	env      func(string) string
+	env      toolkit.Env
 	home     string
 	custom   map[string]string
 }
 
-// NewAliasResolver creates a resolver for the given platform. The env function
-// is used to look up environment variables (typically os.Getenv).
-func NewAliasResolver(p Platform, env func(string) string) *AliasResolver {
-	home := resolveHome(p, env)
+// NewAliasResolver creates a resolver for the given platform. The env is used
+// to look up environment variables and the user's home directory.
+func NewAliasResolver(p Platform, env toolkit.Env) *AliasResolver {
+	home, _ := env.GetHome()
 	return &AliasResolver{
 		platform: p,
 		env:      env,
@@ -71,10 +72,15 @@ func (r *AliasResolver) SetCustomAliases(aliases map[string]string) {
 }
 
 // Resolve expands a path that may start with an alias (e.g. "@config/nvim")
-// into an absolute path. Paths without aliases are treated as relative to
-// the home directory.
+// into an absolute path. A leading "~" or "~/" is expanded to the home
+// directory via toolkit.ExpandPath. Paths without aliases are treated as
+// relative to the home directory.
 func (r *AliasResolver) Resolve(path string) (string, error) {
 	path = filepath.ToSlash(path)
+
+	if strings.HasPrefix(path, "~") {
+		return toolkit.ExpandPath(r.env, path)
+	}
 
 	if !strings.HasPrefix(path, "@") {
 		return filepath.Join(r.home, filepath.FromSlash(path)), nil
@@ -136,12 +142,12 @@ func (r *AliasResolver) resolveBuiltin(alias string) (string, error) {
 
 func (r *AliasResolver) resolveConfig() string {
 	if r.platform.OS == "windows" {
-		if v := r.env("APPDATA"); v != "" {
+		if v := r.env.Get("APPDATA"); v != "" {
 			return v
 		}
 		return filepath.Join(r.home, "AppData", "Roaming")
 	}
-	if v := r.env("XDG_CONFIG_HOME"); v != "" {
+	if v := r.env.Get("XDG_CONFIG_HOME"); v != "" {
 		return v
 	}
 	return filepath.Join(r.home, ".config")
@@ -149,12 +155,12 @@ func (r *AliasResolver) resolveConfig() string {
 
 func (r *AliasResolver) resolveData() string {
 	if r.platform.OS == "windows" {
-		if v := r.env("LOCALAPPDATA"); v != "" {
+		if v := r.env.Get("LOCALAPPDATA"); v != "" {
 			return v
 		}
 		return filepath.Join(r.home, "AppData", "Local")
 	}
-	if v := r.env("XDG_DATA_HOME"); v != "" {
+	if v := r.env.Get("XDG_DATA_HOME"); v != "" {
 		return v
 	}
 	return filepath.Join(r.home, ".local", "share")
@@ -162,13 +168,13 @@ func (r *AliasResolver) resolveData() string {
 
 func (r *AliasResolver) resolveCache() string {
 	if r.platform.OS == "windows" {
-		local := r.env("LOCALAPPDATA")
+		local := r.env.Get("LOCALAPPDATA")
 		if local == "" {
 			local = filepath.Join(r.home, "AppData", "Local")
 		}
 		return filepath.Join(local, "cache")
 	}
-	if v := r.env("XDG_CACHE_HOME"); v != "" {
+	if v := r.env.Get("XDG_CACHE_HOME"); v != "" {
 		return v
 	}
 	return filepath.Join(r.home, ".cache")
@@ -176,13 +182,13 @@ func (r *AliasResolver) resolveCache() string {
 
 func (r *AliasResolver) resolveState() string {
 	if r.platform.OS == "windows" {
-		local := r.env("LOCALAPPDATA")
+		local := r.env.Get("LOCALAPPDATA")
 		if local == "" {
 			local = filepath.Join(r.home, "AppData", "Local")
 		}
 		return filepath.Join(local, "state")
 	}
-	if v := r.env("XDG_STATE_HOME"); v != "" {
+	if v := r.env.Get("XDG_STATE_HOME"); v != "" {
 		return v
 	}
 	return filepath.Join(r.home, ".local", "state")
@@ -190,26 +196,13 @@ func (r *AliasResolver) resolveState() string {
 
 func (r *AliasResolver) resolveBin() string {
 	if r.platform.OS == "windows" {
-		local := r.env("LOCALAPPDATA")
+		local := r.env.Get("LOCALAPPDATA")
 		if local == "" {
 			local = filepath.Join(r.home, "AppData", "Local")
 		}
 		return filepath.Join(local, "bin")
 	}
 	return filepath.Join(r.home, ".local", "bin")
-}
-
-func resolveHome(p Platform, env func(string) string) string {
-	if p.OS == "windows" {
-		if v := env("USERPROFILE"); v != "" {
-			return v
-		}
-		return `C:\Users\default`
-	}
-	if v := env("HOME"); v != "" {
-		return v
-	}
-	return os.Getenv("HOME")
 }
 
 // splitAlias splits "@config/nvim/init.lua" into ("@config", "nvim/init.lua").
