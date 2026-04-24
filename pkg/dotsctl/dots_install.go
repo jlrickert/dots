@@ -2,6 +2,7 @@ package dotsctl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -95,15 +96,9 @@ func (d *Dots) Install(ctx context.Context, opts InstallOptions) (*InstallResult
 
 	var installedFiles []dots.InstalledFile
 	for _, action := range actions {
-		// Backup existing file if it exists
-		if shouldBackup {
-			if data, err := dots.ReadFileForBackup(action.Dest); err == nil {
-				_ = d.Repo.BackupFile(ctx, action.Dest, data)
-			}
+		if err := d.prepareDest(ctx, action.Dest, shouldBackup); err != nil {
+			return nil, err
 		}
-
-		// Remove existing file/symlink if present
-		_ = dots.RemoveLink(action.Dest)
 
 		result, err := dots.PlaceLink(action)
 		if err != nil {
@@ -250,6 +245,40 @@ func (d *Dots) hookRunner() *dots.HookRunner {
 		Stdout: streams.Out,
 		Stderr: streams.Err,
 	}
+}
+
+// prepareDest clears dest in preparation for placing a new link. Regular
+// files and symlinks are backed up (when enabled) and removed; empty
+// directories are removed. A non-empty directory is treated as a user-data
+// conflict and aborts before any destructive action. Paths are touched
+// through d.Runtime so sandboxed callers stay inside their jail.
+func (d *Dots) prepareDest(ctx context.Context, dest string, shouldBackup bool) error {
+	info, err := d.Runtime.Stat(dest, false)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("stat %s: %w", dest, err)
+	}
+
+	if info.IsDir() {
+		entries, err := d.Runtime.ReadDir(dest)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", dest, err)
+		}
+		if len(entries) > 0 {
+			return fmt.Errorf("destination %s is a non-empty directory; move or remove it to proceed", dest)
+		}
+	} else if shouldBackup {
+		if data, err := d.Runtime.ReadFile(dest); err == nil {
+			_ = d.Repo.BackupFile(ctx, dest, data)
+		}
+	}
+
+	if err := d.Runtime.Remove(dest, true); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove existing %s: %w", dest, err)
+	}
+	return nil
 }
 
 // splitPackageRef splits "tap/package" into (tap, package).

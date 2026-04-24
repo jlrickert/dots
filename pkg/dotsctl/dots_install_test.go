@@ -177,6 +177,65 @@ func TestInstall_CopyStrategy(t *testing.T) {
 	require.False(t, info.Mode()&os.ModeSymlink != 0)
 }
 
+func TestInstall_NonEmptyDirAtDest(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+
+	seedPackage(t, d, repo, "personal", "testpkg")
+
+	dry, err := d.Install(ctx, dotsctl.InstallOptions{
+		Package: "personal/testpkg",
+		DryRun:  true,
+	})
+	require.NoError(t, err)
+	require.Len(t, dry.Files, 1)
+	dest := dry.Files[0].Dest
+
+	// Seed the user's data at the destination through Runtime so it lands
+	// where prepareDest will inspect it. Prior to the fix, os.Remove
+	// silently failed on the non-empty directory and PlaceLink reported
+	// a confusing "file exists" error.
+	require.NoError(t, d.Runtime.Mkdir(dest, 0o755, true))
+	require.NoError(t, d.Runtime.WriteFile(filepath.Join(dest, "user-data"), []byte("keep me"), 0o644))
+
+	_, err = d.Install(ctx, dotsctl.InstallOptions{Package: "personal/testpkg"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "non-empty directory")
+
+	// User data must still be readable — the failed install must not have
+	// deleted anything at the destination.
+	data, err := d.Runtime.ReadFile(filepath.Join(dest, "user-data"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("keep me"), data)
+}
+
+func TestInstall_EmptyDirAtDest(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+
+	seedPackage(t, d, repo, "personal", "testpkg")
+
+	dry, err := d.Install(ctx, dotsctl.InstallOptions{
+		Package: "personal/testpkg",
+		DryRun:  true,
+	})
+	require.NoError(t, err)
+	dest := dry.Files[0].Dest
+
+	require.NoError(t, d.Runtime.Mkdir(dest, 0o755, true))
+
+	_, err = d.Install(ctx, dotsctl.InstallOptions{Package: "personal/testpkg"})
+	require.NoError(t, err)
+
+	// After install, dest must no longer be a directory — prepareDest
+	// should have cleared the empty dir and PlaceLink should have
+	// produced the package's link/copy.
+	info, err := d.Runtime.Stat(dest, false)
+	if err == nil {
+		require.False(t, info.IsDir(), "empty dir should have been cleared and replaced")
+	}
+}
+
 // --- Remove ---
 
 func TestRemove_Basic(t *testing.T) {
