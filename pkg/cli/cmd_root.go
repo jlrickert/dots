@@ -101,6 +101,7 @@ func NewRootCmd(deps *Deps) *cobra.Command {
 		newWorkCmd(deps),
 		newSearchCmd(deps),
 		newBrowseCmd(deps),
+		newImplodeCmd(deps),
 	)
 
 	return cmd
