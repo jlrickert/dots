@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/jlrickert/dots/main/schemas/work-state.json",
+  "title": "dots work-state.yaml",
+  "description": "Schema for dots host-local work mode state (~/.local/state/dots/work.yaml). This file is host-local runtime state and must never be committed to a dotfiles repo.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "taps": {
+      "type": "object",
+      "description": "Active work mode mappings from tap name to local checkout path",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

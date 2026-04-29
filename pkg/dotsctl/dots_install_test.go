@@ -122,13 +122,7 @@ func seedWorkModePackage(t *testing.T, d *dotsctl.Dots, repo *dots.MemoryRepo, t
 	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "testfile"), []byte("content"), 0o644))
 	require.NoError(t, repo.AddPackage(tap, dots.PackageInfo{Tap: tap, Name: pkg, Dir: pkg}, manifest))
 
-	cfg, err := d.ConfigService.Config(false)
-	require.NoError(t, err)
-	if cfg.WorkMode == nil {
-		cfg.WorkMode = map[string]string{}
-	}
-	cfg.WorkMode[tap] = workDir
-	require.NoError(t, d.ConfigService.Save(cfg))
+	require.NoError(t, d.WorkStateService.Set(tap, workDir))
 
 	return pkgDir
 }

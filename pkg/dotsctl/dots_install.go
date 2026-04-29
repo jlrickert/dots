@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -175,6 +176,37 @@ func (d *Dots) recordInstall(
 	return d.Repo.WriteLockfile(ctx, lockfile)
 }
 
+// workModePath resolves the local checkout path for tap, preferring the new
+// work state file. If the tap is not in state, falls back to the legacy
+// config.WorkMode map for read-only compatibility (e.g. when migration has
+// not yet been triggered by a write). Returns ("", false) when tap is not in
+// work mode at all.
+//
+// A corrupt work state file is surfaced as a stderr warning rather than
+// returned as an error (the install path keeps working from legacy/default);
+// `dots doctor` reports the parse failure as an error-level check via
+// checkWorkStateFile.
+func (d *Dots) workModePath(tap string) (string, bool) {
+	if d.WorkStateService != nil {
+		state, err := d.WorkStateService.Load(true)
+		if err != nil {
+			fmt.Fprintf(d.Runtime.Stream().Err,
+				"warning: work state file unreadable: %v (run `dots doctor` for details)\n", err)
+		} else if state != nil {
+			if path, ok := state.Taps[tap]; ok {
+				return path, true
+			}
+		}
+	}
+	cfg, _ := d.ConfigService.Config(true)
+	if cfg != nil {
+		if path, ok := cfg.WorkMode[tap]; ok {
+			return path, true
+		}
+	}
+	return "", false
+}
+
 // resolveStrategy picks the link strategy for a tap install.
 // Precedence: explicit override > package manifest > work mode > config > default.
 // Work mode is treated as "live editing" — when the tap is in work mode, default
@@ -186,11 +218,11 @@ func (d *Dots) resolveStrategy(tap string, override, pkgStrategy dots.LinkStrate
 	if pkgStrategy != "" {
 		return pkgStrategy
 	}
+	if _, ok := d.workModePath(tap); ok {
+		return dots.LinkSymlink
+	}
 	cfg, _ := d.ConfigService.Config(true)
 	if cfg != nil {
-		if _, ok := cfg.WorkMode[tap]; ok {
-			return dots.LinkSymlink
-		}
 		core := cfg.ResolveCorePlatform(d.PathService.Platform)
 		if core.LinkStrategy != "" {
 			return core.LinkStrategy
@@ -204,39 +236,30 @@ func (d *Dots) resolveStrategy(tap string, override, pkgStrategy dots.LinkStrate
 // and must be read directly via os.ReadFile — the runtime's jail applies only to
 // dots-managed state, not to arbitrary checkouts the user has declared.
 func (d *Dots) readManifest(ctx context.Context, tap, pkg string) ([]byte, error) {
-	cfg, _ := d.ConfigService.Config(true)
-	if cfg != nil {
-		if localPath, ok := cfg.WorkMode[tap]; ok {
-			manifestPath := localPath + "/" + pkg + "/Dotfile.yaml"
-			data, err := os.ReadFile(manifestPath)
-			if err != nil {
-				return nil, &dots.PackageNotFoundError{Tap: tap, Package: pkg}
-			}
-			return data, nil
+	if localPath, ok := d.workModePath(tap); ok {
+		manifestPath := filepath.Join(localPath, pkg, "Dotfile.yaml")
+		data, err := os.ReadFile(manifestPath)
+		if err != nil {
+			return nil, &dots.PackageNotFoundError{Tap: tap, Package: pkg}
 		}
+		return data, nil
 	}
 	return d.Repo.ReadManifest(ctx, tap, pkg)
 }
 
 // listPackages lists packages in a tap, checking work mode paths first.
 func (d *Dots) listPackages(ctx context.Context, tap string) ([]dots.PackageInfo, error) {
-	cfg, _ := d.ConfigService.Config(true)
-	if cfg != nil {
-		if localPath, ok := cfg.WorkMode[tap]; ok {
-			return dots.ScanPackages(tap, localPath)
-		}
+	if localPath, ok := d.workModePath(tap); ok {
+		return dots.ScanPackages(tap, localPath)
 	}
 	return d.Repo.ListPackages(ctx, tap)
 }
 
 func (d *Dots) packageDir(tap, pkg string) string {
-	cfg, _ := d.ConfigService.Config(true)
-	if cfg != nil {
-		if localPath, ok := cfg.WorkMode[tap]; ok {
-			return localPath + "/" + pkg
-		}
+	if localPath, ok := d.workModePath(tap); ok {
+		return filepath.Join(localPath, pkg)
 	}
-	return d.PathService.TapsDir() + "/" + tap + "/" + pkg
+	return filepath.Join(d.PathService.TapsDir(), tap, pkg)
 }
 
 func (d *Dots) hookRunner() *dots.HookRunner {

@@ -188,6 +188,8 @@ func TestDoctor(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, checks)
 
-	// Should have at least config dir, state dir, config file, and taps checks.
-	require.GreaterOrEqual(t, len(checks), 4)
+	// 4 originals (config dir, state dir, config file, taps) + 6 new
+	// work-state checks (work state file, work mode legacy, work state
+	// conflict, merge conflict markers, work state orphan, work state path).
+	require.GreaterOrEqual(t, len(checks), 10)
 }

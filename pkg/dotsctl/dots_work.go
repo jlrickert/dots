@@ -3,6 +3,8 @@ package dotsctl
 import (
 	"context"
 	"fmt"
+
+	"github.com/jlrickert/cli-toolkit/toolkit"
 )
 
 // WorkOnOptions configures the work on operation.
@@ -19,18 +21,17 @@ type WorkStatus struct {
 
 // WorkOn rewires links for a tap to point at a local checkout.
 func (d *Dots) WorkOn(ctx context.Context, opts WorkOnOptions) error {
-	cfg, err := d.ConfigService.Config(false)
+	localPath, err := toolkit.ExpandPath(d.Runtime, opts.LocalPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("expand local path: %w", err)
 	}
 
-	if cfg.WorkMode == nil {
-		cfg.WorkMode = make(map[string]string)
+	if err := d.migrateWorkModeIfNeeded(); err != nil {
+		return fmt.Errorf("migrate legacy work_mode: %w", err)
 	}
-	cfg.WorkMode[opts.Tap] = opts.LocalPath
 
-	if err := d.ConfigService.Save(cfg); err != nil {
-		return fmt.Errorf("save config: %w", err)
+	if err := d.WorkStateService.Set(opts.Tap, localPath); err != nil {
+		return fmt.Errorf("save work state: %w", err)
 	}
 
 	// Re-link all installed packages from this tap using local path
@@ -48,18 +49,16 @@ func (d *Dots) WorkOn(ctx context.Context, opts WorkOnOptions) error {
 
 // WorkOff rewires links back to the internal clone.
 func (d *Dots) WorkOff(ctx context.Context, tap string) error {
-	cfg, err := d.ConfigService.Config(false)
-	if err != nil {
-		return err
+	if err := d.migrateWorkModeIfNeeded(); err != nil {
+		return fmt.Errorf("migrate legacy work_mode: %w", err)
 	}
 
-	if _, ok := cfg.WorkMode[tap]; !ok {
+	if _, ok := d.WorkStateService.Get(tap); !ok {
 		return fmt.Errorf("tap %q is not in work mode", tap)
 	}
-	delete(cfg.WorkMode, tap)
 
-	if err := d.ConfigService.Save(cfg); err != nil {
-		return fmt.Errorf("save config: %w", err)
+	if err := d.WorkStateService.Delete(tap); err != nil {
+		return fmt.Errorf("save work state: %w", err)
 	}
 
 	// Re-link packages from internal clone
@@ -75,15 +74,29 @@ func (d *Dots) WorkOff(ctx context.Context, tap string) error {
 	return nil
 }
 
-// WorkStatusList returns work mode status for all taps.
+// WorkStatusList returns work mode status for all taps. Reads from both the
+// new state file and any legacy config.yaml work_mode entries, merging in
+// memory for display. Does not trigger migration — migration happens only on
+// the WorkOn/WorkOff write path so that read queries never mutate persistent
+// state.
 func (d *Dots) WorkStatusList(ctx context.Context) ([]WorkStatus, error) {
-	cfg, err := d.ConfigService.Config(true)
+	taps, err := d.WorkStateService.All()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load work state: %w", err)
+	}
+
+	cfg, err := d.ConfigService.Config(true)
+	if err == nil && cfg != nil {
+		for tap, path := range cfg.WorkMode {
+			if _, exists := taps[tap]; exists {
+				continue
+			}
+			taps[tap] = path
+		}
 	}
 
 	var statuses []WorkStatus
-	for tap, path := range cfg.WorkMode {
+	for tap, path := range taps {
 		statuses = append(statuses, WorkStatus{
 			Tap:       tap,
 			LocalPath: path,

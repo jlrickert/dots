@@ -52,6 +52,13 @@ func (s *PathService) LockfilePath() string {
 	return filepath.Join(s.StateDir(), "dots.lock.yaml")
 }
 
+// WorkStateFile returns the path to the host-local work state file
+// (work.yaml inside the state dir). This file holds the active work-mode
+// mappings extracted from the user's version-controlled config.
+func (s *PathService) WorkStateFile() string {
+	return filepath.Join(s.StateDir(), "work.yaml")
+}
+
 // TapsDir returns the directory where tap clones are stored.
 func (s *PathService) TapsDir() string {
 	return filepath.Join(s.StateDir(), "taps")

@@ -15,9 +15,14 @@ const (
 
 // Config represents the user's dots configuration (~/.config/dots/config.yaml).
 type Config struct {
-	Core     CoreConfig            `yaml:"core,omitempty"`
-	Git      GitConfig             `yaml:"git,omitempty"`
-	Taps     map[string]TapConfig  `yaml:"taps,omitempty"`
+	Core CoreConfig           `yaml:"core,omitempty"`
+	Git  GitConfig            `yaml:"git,omitempty"`
+	Taps map[string]TapConfig `yaml:"taps,omitempty"`
+	// Deprecated: WorkMode has moved to the host-local work state file
+	// (@state/dots/work.yaml). The field remains here so legacy configs
+	// still parse, and so the auto-migration on first WorkOn/WorkOff can
+	// see and clear any stale entries. New code should read and write
+	// work-mode mappings via WorkStateService.
 	WorkMode map[string]string     `yaml:"work_mode,omitempty"`
 	Aliases  map[string]string     `yaml:"aliases,omitempty"`
 	Platform map[string]CoreConfig `yaml:"platform,omitempty"`

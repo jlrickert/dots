@@ -1,6 +1,9 @@
 package dotsctl
 
 import (
+	"errors"
+	"os"
+
 	"github.com/jlrickert/cli-toolkit/toolkit"
 	"github.com/jlrickert/dots/pkg/dots"
 	"gopkg.in/yaml.v3"
@@ -24,8 +27,10 @@ func NewConfigService(ps *PathService, configPath string, rt *toolkit.Runtime) *
 	}
 }
 
-// Config returns the effective configuration. If cache is true, a previously
-// loaded config is returned without re-reading from disk.
+// Config returns the effective configuration. A missing config file is not an
+// error — defaults are returned. Parse errors and other read failures are
+// surfaced so callers (including doctor checks) can react. If cache is true, a
+// previously loaded config is returned without re-reading from disk.
 func (s *ConfigService) Config(cache bool) (*dots.Config, error) {
 	if cache && s.cached != nil {
 		return s.cached, nil
@@ -33,10 +38,12 @@ func (s *ConfigService) Config(cache bool) (*dots.Config, error) {
 
 	cfg, err := dots.LoadConfigFile(s.ConfigPath)
 	if err != nil {
-		// If the config file doesn't exist, return defaults.
-		def := dots.DefaultConfig()
-		s.cached = &def
-		return s.cached, nil
+		if errors.Is(err, os.ErrNotExist) {
+			def := dots.DefaultConfig()
+			s.cached = &def
+			return s.cached, nil
+		}
+		return nil, err
 	}
 
 	s.cached = cfg

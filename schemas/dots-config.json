@@ -57,7 +57,7 @@
     },
     "work_mode": {
       "type": "object",
-      "description": "Active work mode mappings from tap name to local directory path",
+      "description": "DEPRECATED: moved to work-state.json (~/.local/state/dots/work.yaml). Kept here for backwards compatibility; auto-migrated on first work on/off invocation.",
       "additionalProperties": { "type": "string" }
     },
     "aliases": {
