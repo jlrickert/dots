@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented in this file.
 
+## v0.5.0 - 2026-04-29
+
+
+
+### Bug Fixes
+- surface directory conflicts on install instead of failing obscurely
+
+
+### Features
+- add implode command to fully uninstall dots state
+
+
+### Miscellaneous
+- bump cli-toolkit to v1.5.0
+
+
+### Refactor
+- split host-local work mode state out of config
+
+
 ## v0.4.0 - 2026-04-24
 
 
