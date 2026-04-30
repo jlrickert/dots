@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **dots** is a Go CLI dotfile package manager with taps, profiles, overlays, and cross-platform support. It treats Git repos as package sources ("taps"), uses path aliases for portability, and supports symlink/copy/hardlink link strategies with platform-aware resolution.
 
-Design specification: `dots-design-v5.md`
+Design specification: `dots-design.md`
 
 ## Build & Development Commands
 
