@@ -6,15 +6,15 @@ dots detects the current OS and architecture at runtime and uses this informatio
 
 A platform is an OS-architecture pair in `os-arch` format:
 
-| Identifier | OS | Architecture |
-|------------|------|--------------|
-| `darwin-arm64` | macOS | Apple Silicon |
-| `darwin-amd64` | macOS | Intel |
-| `linux-amd64` | Linux | x86_64 |
-| `linux-arm64` | Linux | ARM64 |
-| `windows-amd64` | Windows | x86_64 |
-| `windows-arm64` | Windows | ARM64 |
-| `freebsd-amd64` | FreeBSD | x86_64 |
+| Identifier      | OS      | Architecture  |
+| --------------- | ------- | ------------- |
+| `darwin-arm64`  | macOS   | Apple Silicon |
+| `darwin-amd64`  | macOS   | Intel         |
+| `linux-amd64`   | Linux   | x86_64        |
+| `linux-arm64`   | Linux   | ARM64         |
+| `windows-amd64` | Windows | x86_64        |
+| `windows-arm64` | Windows | ARM64         |
+| `freebsd-amd64` | FreeBSD | x86_64        |
 
 You can use either the OS alone (`darwin`) or the full OS-arch pair (`darwin-arm64`) as keys in platform sections. The OS-only key matches all architectures for that OS.
 
@@ -50,11 +50,11 @@ Each step builds on the previous result. More specific sections override less sp
 
 How values combine depends on the data type:
 
-| Type | Behavior | Example |
-|------|----------|---------|
-| Maps (links, merge) | Deep merge: new keys are added, existing keys are replaced | Base links + darwin links |
-| Scalars (link_strategy, hooks) | Replace: more specific value wins | `copy` overrides `symlink` |
-| Lists (tags, requires) | Concatenate with deduplication | `[editor]` + `[macos]` = `[editor, macos]` |
+| Type                           | Behavior                                                   | Example                                    |
+| ------------------------------ | ---------------------------------------------------------- | ------------------------------------------ |
+| Maps (links, merge)            | Deep merge: new keys are added, existing keys are replaced | Base links + darwin links                  |
+| Scalars (link_strategy, hooks) | Replace: more specific value wins                          | `copy` overrides `symlink`                 |
+| Lists (tags, requires)         | Concatenate with deduplication                             | `[editor]` + `[macos]` = `[editor, macos]` |
 
 ### Map Merge Example
 
@@ -140,11 +140,11 @@ platform:
 
 The resolved result:
 
-| Field | Value |
-|-------|-------|
-| links | `init.lua`, `mac-clip.lua`, `bin/nvim` (3 entries) |
-| hooks.post_install | `scripts/install-mac.sh` (darwin overrode base) |
-| tags | `[editor, macos]` (concatenated, deduped) |
+| Field              | Value                                              |
+| ------------------ | -------------------------------------------------- |
+| links              | `init.lua`, `mac-clip.lua`, `bin/nvim` (3 entries) |
+| hooks.post_install | `scripts/install-mac.sh` (darwin overrode base)    |
+| tags               | `[editor, macos]` (concatenated, deduped)          |
 
 Note that `darwin-arm64` did not override `post_install` again, so the darwin value persists.
 
@@ -159,3 +159,25 @@ package:
 ```
 
 This package is skipped during installation on non-macOS systems. Both OS (`darwin`) and OS-arch (`darwin-arm64`) identifiers are accepted. An empty or omitted `platforms` list means the package works on all platforms.
+
+## Apple Aliases and Platform Restrictions
+
+The Apple-family path aliases (`@apple-config`, `@apple-data`, `@apple-cache`, `@apple-logs`, `@apple-launchagents`) only resolve on `darwin`. On every other OS they return an error at resolution time, wrapping the sentinel `dots.ErrAliasUnavailable`.
+
+Because the error fires at resolution rather than at parse time, scope Apple aliases properly:
+
+- Inside a `platform.darwin` block, so non-darwin installs never see them.
+- Optionally combined with `package.platforms: [darwin]` for a "double-locked" Mac-only package — the `platforms` gate skips installation entirely, and the `platform.darwin` block keeps the Apple aliases out of the resolved manifest on other systems.
+
+```yaml
+package:
+  name: my-launchagent
+  platforms: [darwin]
+
+platform:
+  darwin:
+    links:
+      com.user.foo.plist: "@apple-launchagents/com.user.foo.plist"
+```
+
+See [Path Aliases](path-aliases.md#apple-family-apple--darwin-only) for the full Apple family table.

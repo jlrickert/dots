@@ -39,11 +39,34 @@ const (
 	AliasCache  Alias = "@cache"
 	AliasState  Alias = "@state"
 	AliasBin    Alias = "@bin"
+
+	// XDG family — always resolves to XDG paths regardless of OS, including
+	// Windows. Honors XDG_*_HOME env vars, otherwise falls back to the
+	// standard XDG default directories (~/.config, ~/.local/share, ~/.cache,
+	// ~/.local/state). XDG does not specify a binary directory, so there is
+	// no @xdg-bin.
+	AliasXDGConfig Alias = "@xdg-config"
+	AliasXDGData   Alias = "@xdg-data"
+	AliasXDGCache  Alias = "@xdg-cache"
+	AliasXDGState  Alias = "@xdg-state"
+
+	// Apple family — Apple HIG-style locations under ~/Library on darwin
+	// only. On non-darwin platforms these aliases return an
+	// AliasUnavailableError wrapping ErrAliasUnavailable. Note that
+	// @apple-config and @apple-data both resolve to
+	// ~/Library/Application Support; Apple HIG conflates these.
+	AliasAppleConfig       Alias = "@apple-config"
+	AliasAppleData         Alias = "@apple-data"
+	AliasAppleCache        Alias = "@apple-cache"
+	AliasAppleLogs         Alias = "@apple-logs"
+	AliasAppleLaunchAgents Alias = "@apple-launchagents"
 )
 
 // BuiltinAliases is the ordered list of built-in alias names.
 var BuiltinAliases = []Alias{
 	AliasHome, AliasConfig, AliasData, AliasCache, AliasState, AliasBin,
+	AliasXDGConfig, AliasXDGData, AliasXDGCache, AliasXDGState,
+	AliasAppleConfig, AliasAppleData, AliasAppleCache, AliasAppleLogs, AliasAppleLaunchAgents,
 }
 
 // AliasResolver resolves path aliases to absolute paths for a given platform.
@@ -135,9 +158,63 @@ func (r *AliasResolver) resolveBuiltin(alias string) (string, error) {
 		return r.resolveState(), nil
 	case AliasBin:
 		return r.resolveBin(), nil
+	case AliasXDGConfig:
+		return r.resolveXDGConfig(), nil
+	case AliasXDGData:
+		return r.resolveXDGData(), nil
+	case AliasXDGCache:
+		return r.resolveXDGCache(), nil
+	case AliasXDGState:
+		return r.resolveXDGState(), nil
+	case AliasAppleConfig:
+		return r.resolveAppleConfig()
+	case AliasAppleData:
+		return r.resolveAppleData()
+	case AliasAppleCache:
+		return r.resolveAppleCache()
+	case AliasAppleLogs:
+		return r.resolveAppleLogs()
+	case AliasAppleLaunchAgents:
+		return r.resolveAppleLaunchAgents()
 	default:
 		return "", fmt.Errorf("unknown alias: %s", alias)
 	}
+}
+
+// resolveXDGConfig returns the XDG config home regardless of OS. Honors
+// XDG_CONFIG_HOME if set, otherwise defaults to ~/.config (even on Windows).
+func (r *AliasResolver) resolveXDGConfig() string {
+	if v := r.env.Get("XDG_CONFIG_HOME"); v != "" {
+		return v
+	}
+	return filepath.Join(r.home, ".config")
+}
+
+// resolveXDGData returns the XDG data home regardless of OS. Honors
+// XDG_DATA_HOME if set, otherwise defaults to ~/.local/share.
+func (r *AliasResolver) resolveXDGData() string {
+	if v := r.env.Get("XDG_DATA_HOME"); v != "" {
+		return v
+	}
+	return filepath.Join(r.home, ".local", "share")
+}
+
+// resolveXDGCache returns the XDG cache home regardless of OS. Honors
+// XDG_CACHE_HOME if set, otherwise defaults to ~/.cache.
+func (r *AliasResolver) resolveXDGCache() string {
+	if v := r.env.Get("XDG_CACHE_HOME"); v != "" {
+		return v
+	}
+	return filepath.Join(r.home, ".cache")
+}
+
+// resolveXDGState returns the XDG state home regardless of OS. Honors
+// XDG_STATE_HOME if set, otherwise defaults to ~/.local/state.
+func (r *AliasResolver) resolveXDGState() string {
+	if v := r.env.Get("XDG_STATE_HOME"); v != "" {
+		return v
+	}
+	return filepath.Join(r.home, ".local", "state")
 }
 
 func (r *AliasResolver) resolveConfig() string {
@@ -147,10 +224,7 @@ func (r *AliasResolver) resolveConfig() string {
 		}
 		return filepath.Join(r.home, "AppData", "Roaming")
 	}
-	if v := r.env.Get("XDG_CONFIG_HOME"); v != "" {
-		return v
-	}
-	return filepath.Join(r.home, ".config")
+	return r.resolveXDGConfig()
 }
 
 func (r *AliasResolver) resolveData() string {
@@ -160,10 +234,7 @@ func (r *AliasResolver) resolveData() string {
 		}
 		return filepath.Join(r.home, "AppData", "Local")
 	}
-	if v := r.env.Get("XDG_DATA_HOME"); v != "" {
-		return v
-	}
-	return filepath.Join(r.home, ".local", "share")
+	return r.resolveXDGData()
 }
 
 func (r *AliasResolver) resolveCache() string {
@@ -174,10 +245,7 @@ func (r *AliasResolver) resolveCache() string {
 		}
 		return filepath.Join(local, "cache")
 	}
-	if v := r.env.Get("XDG_CACHE_HOME"); v != "" {
-		return v
-	}
-	return filepath.Join(r.home, ".cache")
+	return r.resolveXDGCache()
 }
 
 func (r *AliasResolver) resolveState() string {
@@ -188,10 +256,7 @@ func (r *AliasResolver) resolveState() string {
 		}
 		return filepath.Join(local, "state")
 	}
-	if v := r.env.Get("XDG_STATE_HOME"); v != "" {
-		return v
-	}
-	return filepath.Join(r.home, ".local", "state")
+	return r.resolveXDGState()
 }
 
 func (r *AliasResolver) resolveBin() string {
@@ -203,6 +268,39 @@ func (r *AliasResolver) resolveBin() string {
 		return filepath.Join(local, "bin")
 	}
 	return filepath.Join(r.home, ".local", "bin")
+}
+
+// appleLibrary returns the joined ~/Library/<sub> path on darwin, or an
+// AliasUnavailableError on every other OS. The error wraps
+// ErrAliasUnavailable so callers can detect it via errors.Is.
+func (r *AliasResolver) appleLibrary(alias string, sub ...string) (string, error) {
+	if r.platform.OS != "darwin" {
+		return "", &AliasUnavailableError{Alias: alias, OS: r.platform.OS}
+	}
+	parts := append([]string{r.home, "Library"}, sub...)
+	return filepath.Join(parts...), nil
+}
+
+func (r *AliasResolver) resolveAppleConfig() (string, error) {
+	// Apple HIG conflates config and data under Application Support.
+	return r.appleLibrary(AliasAppleConfig, "Application Support")
+}
+
+func (r *AliasResolver) resolveAppleData() (string, error) {
+	// Apple HIG conflates config and data under Application Support.
+	return r.appleLibrary(AliasAppleData, "Application Support")
+}
+
+func (r *AliasResolver) resolveAppleCache() (string, error) {
+	return r.appleLibrary(AliasAppleCache, "Caches")
+}
+
+func (r *AliasResolver) resolveAppleLogs() (string, error) {
+	return r.appleLibrary(AliasAppleLogs, "Logs")
+}
+
+func (r *AliasResolver) resolveAppleLaunchAgents() (string, error) {
+	return r.appleLibrary(AliasAppleLaunchAgents, "LaunchAgents")
 }
 
 // splitAlias splits "@config/nvim/init.lua" into ("@config", "nvim/init.lua").

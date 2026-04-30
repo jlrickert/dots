@@ -75,7 +75,7 @@
     },
     "links": {
       "type": "object",
-      "description": "Map of source file paths to target paths. Targets support @alias paths (@home, @config, @data, @cache, @state, @bin).",
+      "description": "Map of source file paths to target paths. Targets support @alias paths: the default family (@home, @config, @data, @cache, @state, @bin); the XDG family (@xdg-config, @xdg-data, @xdg-cache, @xdg-state) which always resolves to XDG paths regardless of OS; and the Apple family (@apple-config, @apple-data, @apple-cache, @apple-logs, @apple-launchagents) which resolves to ~/Library subdirectories on darwin and errors on other platforms.",
       "additionalProperties": { "type": "string" }
     },
     "hooks": {

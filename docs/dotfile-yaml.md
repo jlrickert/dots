@@ -327,3 +327,40 @@ merge:
 links:
   work-aliases.zsh: "@config/zsh/work-aliases.zsh"
 ```
+
+### Apple-Family Aliases (LaunchAgents)
+
+Apple-family aliases (`@apple-*`) resolve to `~/Library/...` on darwin and error on other platforms. Scope them inside `platform.darwin` so non-darwin installs never see them. See [Path Aliases](path-aliases.md#apple-family-apple--darwin-only).
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+package:
+  name: my-launchd-job
+  description: Periodic backup launchd agent
+  version: 1.0.0
+  platforms: [darwin]
+
+platform:
+  darwin:
+    links:
+      com.user.backup.plist: "@apple-launchagents/com.user.backup.plist"
+```
+
+### XDG-Everywhere Aliases (nvim on Windows)
+
+The `@xdg-*` family always resolves to XDG paths regardless of OS. Use it for tools like Neovim that follow the XDG Base Directory spec on every platform — including Windows, where `@config` would otherwise resolve to `%APPDATA%`.
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+package:
+  name: nvim-xdg
+  description: Neovim configuration pinned to XDG paths everywhere
+  version: 1.0.0
+  tags: [editor, neovim]
+
+links:
+  init.lua: "@xdg-config/nvim/init.lua"
+  lua/: "@xdg-config/nvim/lua/"
+```
+
+On all three of macOS, Linux, and Windows, this resolves to `~/.config/nvim/...` (honoring `$XDG_CONFIG_HOME` if set).

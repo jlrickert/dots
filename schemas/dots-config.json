@@ -62,7 +62,7 @@
     },
     "aliases": {
       "type": "object",
-      "description": "Custom path aliases (e.g. @nvim -> @config/nvim). Values may reference other aliases.",
+      "description": "Custom path aliases (e.g. @nvim -> @config/nvim). Values may reference other aliases, including any builtin from the default family (@home, @config, @data, @cache, @state, @bin), the XDG family (@xdg-config, @xdg-data, @xdg-cache, @xdg-state), or the Apple family (@apple-config, @apple-data, @apple-cache, @apple-logs, @apple-launchagents).",
       "additionalProperties": { "type": "string" }
     },
     "platform": {

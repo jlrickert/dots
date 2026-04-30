@@ -8,12 +8,13 @@ import (
 
 // Sentinel errors for simple equality checks.
 var (
-	ErrInvalid    = os.ErrInvalid
-	ErrExist      = os.ErrExist
-	ErrNotExist   = os.ErrNotExist
-	ErrPermission = os.ErrPermission
-	ErrParse      = errors.New("unable to parse")
-	ErrConflict   = errors.New("conflict")
+	ErrInvalid          = os.ErrInvalid
+	ErrExist            = os.ErrExist
+	ErrNotExist         = os.ErrNotExist
+	ErrPermission       = os.ErrPermission
+	ErrParse            = errors.New("unable to parse")
+	ErrConflict         = errors.New("conflict")
+	ErrAliasUnavailable = errors.New("alias unavailable on this platform")
 )
 
 // TapNotFoundError is returned when a tap alias cannot be resolved.
@@ -60,3 +61,22 @@ func (e *InvalidConfigError) Is(target error) bool {
 }
 
 func (e *InvalidConfigError) Unwrap() error { return ErrInvalid }
+
+// AliasUnavailableError is returned when an alias is not available on the
+// current platform (for example, an Apple-family alias resolved on Linux).
+// It wraps ErrAliasUnavailable so callers can detect the condition with
+// errors.Is.
+type AliasUnavailableError struct {
+	Alias string
+	OS    string
+}
+
+func (e *AliasUnavailableError) Error() string {
+	return fmt.Sprintf("alias %s is not available on %s", e.Alias, e.OS)
+}
+
+func (e *AliasUnavailableError) Is(target error) bool {
+	return target == ErrAliasUnavailable
+}
+
+func (e *AliasUnavailableError) Unwrap() error { return ErrAliasUnavailable }

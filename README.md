@@ -66,49 +66,49 @@ This creates a default config at `~/.config/dots/config.yaml` (Unix) or `%APPDAT
 
 ## Feature Status
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| **Core Operations** | | |
-| Init (`--from`, `--path`) | Done | Self-bootstrapping from existing repo |
-| Install | Done | Manifest parsing, platform cascade, hooks, lockfile, `--dry-run`, `--strategy` |
-| Remove | Done | Lockfile lookup, link removal, backup restore, hooks |
-| Upgrade (`--all`) | Done | Tap update + reinstall |
-| Reinstall | Done | Remove then install |
-| **Tap Management** | | |
-| Add / Remove / List / Update | Done | Git clone and pull |
-| **Discovery** | | |
-| List (`--available`) | Done | Installed and available packages |
-| Search | Done | Name, description, and tag matching |
-| Browse | Done | Per-tap listing with metadata |
-| Info | Done | Manifest details + installed state |
-| Diff | Done | Checksum comparison for copy-strategy files |
-| Which | Done | Identify which package owns a file |
-| **Profiles** | | |
-| Full CRUD + apply / switch | Done | create, delete, list, show, add, remove, apply, switch |
-| Export / Import | Done | YAML-based profile sharing |
-| Inheritance (`extends`) | Done | Chain resolution with dedup |
-| **Work Mode** | | |
-| On / Off / Status / Rebuild | Done | Automatic re-linking on toggle |
-| **Sync** | | |
-| Sync (`--all`) | Done | Checksum-based re-copy for copy-strategy packages |
-| Sync `--watch` | Planned | File-watching not yet implemented |
-| **Link System** | | |
-| Symlink / Copy / Hardlink | Done | Copy uses sha256 checksums |
-| Hook execution | Done | File-based and inline commands, platform-aware shell |
-| Platform cascade | Done | Deep merge: base -> OS -> OS-arch |
-| Path alias resolution | Done | `@config`, `@home`, `@data`, etc. with custom aliases |
-| **Diagnostics** | | |
-| Status / Doctor | Done | Platform, config, profile, counts, diagnostic checks |
-| **Overlays** | | |
-| Overlay merge system | Partial | Merge primitives exist and are tested, but `dots install` does not call them yet. See [Overlays](docs/overlays.md) for the intended design |
-| **Configuration** | | |
-| Conflict strategy | Partial | Config field is parsed but not acted on; install always backs up and replaces. See [config.yaml](docs/config-yaml.md) |
-| Dependency resolution (`requires`) | Partial | Manifest field is parsed and cascaded but install does not auto-install dependencies. See [Dotfile.yaml](docs/dotfile-yaml.md) |
-| Shell completions | Done | zsh, bash, fish for all commands |
-| JSON schemas | Done | Dotfile.yaml and config.yaml |
-| **Planned** | | |
-| Windows symlink auto-detection | Planned | No test-then-fallback logic yet. [docs/link-strategies.md](docs/link-strategies.md) describes this as working but it is not implemented |
-| Directory link handling | Planned | Trailing `/` for recursive links not yet supported. [docs/dotfile-yaml.md](docs/dotfile-yaml.md) documents this syntax but the linker does not handle it |
+| Feature                            | Status  | Notes                                                                                                                                                    |
+| ---------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Core Operations**                |         |                                                                                                                                                          |
+| Init (`--from`, `--path`)          | Done    | Self-bootstrapping from existing repo                                                                                                                    |
+| Install                            | Done    | Manifest parsing, platform cascade, hooks, lockfile, `--dry-run`, `--strategy`                                                                           |
+| Remove                             | Done    | Lockfile lookup, link removal, backup restore, hooks                                                                                                     |
+| Upgrade (`--all`)                  | Done    | Tap update + reinstall                                                                                                                                   |
+| Reinstall                          | Done    | Remove then install                                                                                                                                      |
+| **Tap Management**                 |         |                                                                                                                                                          |
+| Add / Remove / List / Update       | Done    | Git clone and pull                                                                                                                                       |
+| **Discovery**                      |         |                                                                                                                                                          |
+| List (`--available`)               | Done    | Installed and available packages                                                                                                                         |
+| Search                             | Done    | Name, description, and tag matching                                                                                                                      |
+| Browse                             | Done    | Per-tap listing with metadata                                                                                                                            |
+| Info                               | Done    | Manifest details + installed state                                                                                                                       |
+| Diff                               | Done    | Checksum comparison for copy-strategy files                                                                                                              |
+| Which                              | Done    | Identify which package owns a file                                                                                                                       |
+| **Profiles**                       |         |                                                                                                                                                          |
+| Full CRUD + apply / switch         | Done    | create, delete, list, show, add, remove, apply, switch                                                                                                   |
+| Export / Import                    | Done    | YAML-based profile sharing                                                                                                                               |
+| Inheritance (`extends`)            | Done    | Chain resolution with dedup                                                                                                                              |
+| **Work Mode**                      |         |                                                                                                                                                          |
+| On / Off / Status / Rebuild        | Done    | Automatic re-linking on toggle                                                                                                                           |
+| **Sync**                           |         |                                                                                                                                                          |
+| Sync (`--all`)                     | Done    | Checksum-based re-copy for copy-strategy packages                                                                                                        |
+| Sync `--watch`                     | Planned | File-watching not yet implemented                                                                                                                        |
+| **Link System**                    |         |                                                                                                                                                          |
+| Symlink / Copy / Hardlink          | Done    | Copy uses sha256 checksums                                                                                                                               |
+| Hook execution                     | Done    | File-based and inline commands, platform-aware shell                                                                                                     |
+| Platform cascade                   | Done    | Deep merge: base -> OS -> OS-arch                                                                                                                        |
+| Path alias resolution              | Done    | `@config`, `@home`, `@data`, etc. (plus `@xdg-*` and `@apple-*` families) with custom aliases                                                            |
+| **Diagnostics**                    |         |                                                                                                                                                          |
+| Status / Doctor                    | Done    | Platform, config, profile, counts, diagnostic checks                                                                                                     |
+| **Overlays**                       |         |                                                                                                                                                          |
+| Overlay merge system               | Partial | Merge primitives exist and are tested, but `dots install` does not call them yet. See [Overlays](docs/overlays.md) for the intended design               |
+| **Configuration**                  |         |                                                                                                                                                          |
+| Conflict strategy                  | Partial | Config field is parsed but not acted on; install always backs up and replaces. See [config.yaml](docs/config-yaml.md)                                    |
+| Dependency resolution (`requires`) | Partial | Manifest field is parsed and cascaded but install does not auto-install dependencies. See [Dotfile.yaml](docs/dotfile-yaml.md)                           |
+| Shell completions                  | Done    | zsh, bash, fish for all commands                                                                                                                         |
+| JSON schemas                       | Done    | Dotfile.yaml and config.yaml                                                                                                                             |
+| **Planned**                        |         |                                                                                                                                                          |
+| Windows symlink auto-detection     | Planned | No test-then-fallback logic yet. [docs/link-strategies.md](docs/link-strategies.md) describes this as working but it is not implemented                  |
+| Directory link handling            | Planned | Trailing `/` for recursive links not yet supported. [docs/dotfile-yaml.md](docs/dotfile-yaml.md) documents this syntax but the linker does not handle it |
 
 ## Adding Taps
 
@@ -222,11 +222,11 @@ For the full manifest reference, see [Dotfile.yaml Reference](docs/dotfile-yaml.
 
 dots supports three strategies, configurable globally, per-platform, or per-package:
 
-| Strategy | Behavior | Edits propagate? |
-|----------|----------|-------------------|
-| `symlink` (default) | Symlink from target to source | Instantly |
-| `copy` | Copy source to target | No, run `dots sync` |
-| `hardlink` | Hardlink (same filesystem) | Instantly |
+| Strategy            | Behavior                      | Edits propagate?    |
+| ------------------- | ----------------------------- | ------------------- |
+| `symlink` (default) | Symlink from target to source | Instantly           |
+| `copy`              | Copy source to target         | No, run `dots sync` |
+| `hardlink`          | Hardlink (same filesystem)    | Instantly           |
 
 For details on each strategy, configuration hierarchy, and Windows auto-detection, see [Link Strategies](docs/link-strategies.md).
 
@@ -271,17 +271,17 @@ For the full configuration reference, see [config.yaml Reference](docs/config-ya
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Dotfile.yaml Reference](docs/dotfile-yaml.md) | Package manifest format, all fields, examples |
-| [config.yaml Reference](docs/config-yaml.md) | User configuration, defaults, platform overrides |
-| [Path Aliases](docs/path-aliases.md) | Built-in and custom path aliases, resolution rules |
-| [CLI Reference](docs/cli-reference.md) | All commands, flags, and usage examples |
-| [Platform System](docs/platform-system.md) | Platform detection, cascade resolution, merge rules |
-| [Link Strategies](docs/link-strategies.md) | symlink, copy, hardlink deep dive |
-| [Profiles](docs/profiles.md) | Profile system, inheritance, export/import |
-| [Overlays](docs/overlays.md) | Overlay system, merge strategies, priority |
-| [Work Mode](docs/work-mode.md) | Development workflow with local checkouts |
-| [Bootstrapping](docs/bootstrapping.md) | Self-bootstrapping and machine recovery |
+| Document                                       | Description                                         |
+| ---------------------------------------------- | --------------------------------------------------- |
+| [Dotfile.yaml Reference](docs/dotfile-yaml.md) | Package manifest format, all fields, examples       |
+| [config.yaml Reference](docs/config-yaml.md)   | User configuration, defaults, platform overrides    |
+| [Path Aliases](docs/path-aliases.md)           | Built-in and custom path aliases, resolution rules  |
+| [CLI Reference](docs/cli-reference.md)         | All commands, flags, and usage examples             |
+| [Platform System](docs/platform-system.md)     | Platform detection, cascade resolution, merge rules |
+| [Link Strategies](docs/link-strategies.md)     | symlink, copy, hardlink deep dive                   |
+| [Profiles](docs/profiles.md)                   | Profile system, inheritance, export/import          |
+| [Overlays](docs/overlays.md)                   | Overlay system, merge strategies, priority          |
+| [Work Mode](docs/work-mode.md)                 | Development workflow with local checkouts           |
+| [Bootstrapping](docs/bootstrapping.md)         | Self-bootstrapping and machine recovery             |
 
-For the design specification, see [dots-design-v5.md](dots-design-v5.md).
+For the design specification, see [dots-design.md](dots-design.md).

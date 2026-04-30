@@ -92,14 +92,53 @@ Path aliases solve the cross-platform path problem. A link target of `@config/nv
 
 ### Built-in Aliases
 
-| Alias     | macOS                        | Linux                        | Windows                    |
-|-----------|------------------------------|------------------------------|----------------------------|
-| `@home`   | `$HOME`                     | `$HOME`                     | `%USERPROFILE%`            |
-| `@config` | `$XDG_CONFIG_HOME` (~/.config) | `$XDG_CONFIG_HOME` (~/.config) | `%APPDATA%`               |
-| `@data`   | `$XDG_DATA_HOME` (~/.local/share) | `$XDG_DATA_HOME` (~/.local/share) | `%LOCALAPPDATA%`          |
-| `@cache`  | `$XDG_CACHE_HOME` (~/.cache) | `$XDG_CACHE_HOME` (~/.cache) | `%LOCALAPPDATA%\cache`    |
-| `@state`  | `$XDG_STATE_HOME` (~/.local/state) | `$XDG_STATE_HOME` (~/.local/state) | `%LOCALAPPDATA%\state`   |
-| `@bin`    | `~/.local/bin`              | `~/.local/bin`              | `%LOCALAPPDATA%\bin`       |
+dots ships three families of built-in aliases:
+
+- **Default family** — sensible cross-platform defaults: XDG on Unix, native on Windows.
+- **XDG family** (`@xdg-*`) — forces XDG paths on every OS, including Windows.
+- **Apple family** (`@apple-*`) — Apple HIG locations under `~/Library`. Darwin only.
+
+#### Default family
+
+| Alias     | macOS                              | Linux                              | Windows                |
+| --------- | ---------------------------------- | ---------------------------------- | ---------------------- |
+| `@home`   | `$HOME`                            | `$HOME`                            | `%USERPROFILE%`        |
+| `@config` | `$XDG_CONFIG_HOME` (~/.config)     | `$XDG_CONFIG_HOME` (~/.config)     | `%APPDATA%`            |
+| `@data`   | `$XDG_DATA_HOME` (~/.local/share)  | `$XDG_DATA_HOME` (~/.local/share)  | `%LOCALAPPDATA%`       |
+| `@cache`  | `$XDG_CACHE_HOME` (~/.cache)       | `$XDG_CACHE_HOME` (~/.cache)       | `%LOCALAPPDATA%\cache` |
+| `@state`  | `$XDG_STATE_HOME` (~/.local/state) | `$XDG_STATE_HOME` (~/.local/state) | `%LOCALAPPDATA%\state` |
+| `@bin`    | `~/.local/bin`                     | `~/.local/bin`                     | `%LOCALAPPDATA%\bin`   |
+
+#### XDG family (`@xdg-*`)
+
+| Alias         | macOS / Linux / Windows                      |
+| ------------- | -------------------------------------------- |
+| `@xdg-config` | `$XDG_CONFIG_HOME` (default `~/.config`)     |
+| `@xdg-data`   | `$XDG_DATA_HOME` (default `~/.local/share`)  |
+| `@xdg-cache`  | `$XDG_CACHE_HOME` (default `~/.cache`)       |
+| `@xdg-state`  | `$XDG_STATE_HOME` (default `~/.local/state`) |
+
+There is no `@xdg-bin`; XDG does not specify one. On Windows the defaults are still `~/.config`, `~/.local/share`, etc. — they do **not** fall back to `%APPDATA%`/`%LOCALAPPDATA%`. Use `@xdg-*` when a tool insists on XDG everywhere (e.g. Neovim on Windows).
+
+#### Apple family (`@apple-*`, darwin only)
+
+| Alias                 | macOS                           | Linux / Windows |
+| --------------------- | ------------------------------- | --------------- |
+| `@apple-config`       | `~/Library/Application Support` | error           |
+| `@apple-data`         | `~/Library/Application Support` | error           |
+| `@apple-cache`        | `~/Library/Caches`              | error           |
+| `@apple-logs`         | `~/Library/Logs`                | error           |
+| `@apple-launchagents` | `~/Library/LaunchAgents`        | error           |
+
+Apple HIG conflates user config and application data, so `@apple-config` and `@apple-data` resolve to the same directory. On non-darwin platforms every `@apple-*` alias returns `*AliasUnavailableError` wrapping `ErrAliasUnavailable`. Always scope Apple aliases inside a `platform.darwin` block (and ideally pair with `package.platforms: [darwin]`).
+
+### XDG vs Apple-HIG
+
+dots takes a deliberate stance: **default to XDG on Unix and native on Windows**, but make the alternatives explicit when needed.
+
+- The default `@config`/`@data`/etc. follows the XDG-on-Unix-and-WSL, native-on-Windows convention. This is the common case and produces portable manifests.
+- `@xdg-*` is the explicit opt-in for tools that follow XDG on Windows too. Without it, a manifest that wants nvim's `init.lua` at `~/.config/nvim/init.lua` on Windows would have to spell out a raw path.
+- `@apple-*` is the explicit opt-in for Mac-native locations like LaunchAgents that have no XDG analogue. Apple HIG locations are not a portable default — they only resolve on darwin and error elsewhere.
 
 ### Usage in Manifests
 
@@ -115,7 +154,7 @@ Aliases are optional. Raw paths are always relative to `$HOME` (Unix) or `%USERP
 
 ```yaml
 links:
-  .gitconfig: .gitconfig                  # $HOME/.gitconfig on all platforms
+  .gitconfig: .gitconfig # $HOME/.gitconfig on all platforms
 ```
 
 For files that land in different locations per platform, use platform sections with raw paths or aliases — whichever is clearer:
@@ -161,26 +200,29 @@ Symlinks are the ideal link mechanism — edit in place, changes propagate insta
 Link strategy is configurable at three levels. More specific wins.
 
 **Global** (in `config.yaml`):
+
 ```yaml
 core:
-  link_strategy: symlink     # symlink | copy | hardlink
+  link_strategy: symlink # symlink | copy | hardlink
 ```
 
 **Per-platform** (in `config.yaml`):
+
 ```yaml
 core:
   link_strategy: symlink
 
 platform:
   windows:
-    link_strategy: copy      # Windows defaults to copy
+    link_strategy: copy # Windows defaults to copy
 ```
 
 **Per-package** (in `Dotfile.yaml`):
+
 ```yaml
 package:
   name: ssh
-  link_strategy: copy        # always copy — ssh doesn't follow symlinks
+  link_strategy: copy # always copy — ssh doesn't follow symlinks
 ```
 
 ### Resolution Order
@@ -192,11 +234,11 @@ package:
 
 ### Strategy Behaviors
 
-| Strategy   | Behavior | Work Mode | Edits Propagate |
-|------------|----------|-----------|-----------------|
-| `symlink`  | Create symlink from target → source | Yes, instant | Instantly — same file |
-| `copy`     | Copy file from source to target | Yes, but requires `dots sync` | No — must run `dots sync` |
-| `hardlink` | Create hardlink (files only, same filesystem) | Yes, instant | Instantly — same inode |
+| Strategy   | Behavior                                      | Work Mode                     | Edits Propagate           |
+| ---------- | --------------------------------------------- | ----------------------------- | ------------------------- |
+| `symlink`  | Create symlink from target → source           | Yes, instant                  | Instantly — same file     |
+| `copy`     | Copy file from source to target               | Yes, but requires `dots sync` | No — must run `dots sync` |
+| `hardlink` | Create hardlink (files only, same filesystem) | Yes, instant                  | Instantly — same inode    |
 
 ### The `dots sync` Command
 
@@ -240,17 +282,18 @@ With copies, you edit in `~/code/dotfiles/` and run `dots sync` to push changes 
 
 Platforms are OS-arch pairs using Go/uname conventions:
 
-| Identifier        | OS      | Arch    |
-|--------------------|---------|---------|
-| `darwin-arm64`     | macOS   | Apple Silicon |
-| `darwin-amd64`     | macOS   | Intel |
-| `linux-amd64`     | Linux   | x86_64 |
-| `linux-arm64`     | Linux   | aarch64 |
-| `windows-amd64`   | Windows | x86_64 |
-| `windows-arm64`   | Windows | ARM64 |
-| `freebsd-amd64`   | FreeBSD | x86_64 |
+| Identifier      | OS      | Arch          |
+| --------------- | ------- | ------------- |
+| `darwin-arm64`  | macOS   | Apple Silicon |
+| `darwin-amd64`  | macOS   | Intel         |
+| `linux-amd64`   | Linux   | x86_64        |
+| `linux-arm64`   | Linux   | aarch64       |
+| `windows-amd64` | Windows | x86_64        |
+| `windows-arm64` | Windows | ARM64         |
+| `freebsd-amd64` | FreeBSD | x86_64        |
 
 dots detects the current platform at runtime:
+
 - Unix: `uname -s` + `uname -m`, normalized to lowercase
 - Windows: OS detection + `%PROCESSOR_ARCHITECTURE%`
 - WSL: detected as `linux` (the kernel is Linux)
@@ -307,13 +350,13 @@ platform:
 ```yaml
 # Effective manifest (computed, never written to disk)
 links:
-  init.lua: %APPDATA%\nvim\init.lua                        # @config → %APPDATA%
+  init.lua: %APPDATA%\nvim\init.lua # @config → %APPDATA%
   lua/: %APPDATA%\nvim\lua\
   after/: %APPDATA%\nvim\after\
-  helpers/win-clipboard.lua: %APPDATA%\nvim\lua\clipboard.lua  # from windows
+  helpers/win-clipboard.lua: %APPDATA%\nvim\lua\clipboard.lua # from windows
 
 hooks:
-  post_install: scripts/install-plugins.ps1                 # windows replaced base
+  post_install: scripts/install-plugins.ps1 # windows replaced base
 ```
 
 ### Platform-Only Packages
@@ -340,6 +383,7 @@ scripts/
 ```
 
 The platform section points to the right script. dots does not interpret or translate scripts — it runs whatever the manifest specifies using the platform's native shell:
+
 - Unix: `$SHELL` or `/bin/sh`
 - Windows: `powershell.exe` for `.ps1`, `cmd.exe` for `.bat`/`.cmd`
 
@@ -390,16 +434,16 @@ Using `@config` here means the dots config lands in the right place on every pla
 
 ```yaml
 package:
-  name: string                     # required
+  name: string # required
   description: string
-  version: string                  # semver
-  requires: [tap/package, ...]     # dependencies
+  version: string # semver
+  requires: [tap/package, ...] # dependencies
   tags: [string, ...]
-  platforms: [os-arch, ...]        # restrict to platforms (default: all)
-  link_strategy: symlink | copy | hardlink   # override global strategy
+  platforms: [os-arch, ...] # restrict to platforms (default: all)
+  link_strategy: symlink | copy | hardlink # override global strategy
 
-links:                              # required — source: target
-  source-path: target-path          # target can use @aliases or raw paths
+links: # required — source: target
+  source-path: target-path # target can use @aliases or raw paths
 
 hooks:
   pre_install: script-path
@@ -409,16 +453,16 @@ hooks:
   pre_upgrade: script-path
   post_upgrade: script-path
 
-overlay:                            # omit for base packages
+overlay: # omit for base packages
   base: tap/package
   strategy: append | prepend | replace | merge
   priority: 0-99
 
-merge:                              # per-file strategy overrides
+merge: # per-file strategy overrides
   filename: append | prepend | replace | merge
 
 platform:
-  <os>:                             # darwin, linux, windows, freebsd
+  <os>: # darwin, linux, windows, freebsd
     links: {}
     hooks: {}
     requires: []
@@ -426,7 +470,7 @@ platform:
     overlay: {}
     merge: {}
     link_strategy: symlink | copy | hardlink
-  <os-arch>:                        # darwin-arm64, windows-amd64, etc.
+  <os-arch>: # darwin-arm64, windows-amd64, etc.
     # same structure
 ```
 
@@ -526,11 +570,11 @@ dots rebuild [<tap>/<package>]
 
 ### Behavior by Link Strategy
 
-| Strategy | Work mode behavior | Edit propagation |
-|----------|-------------------|------------------|
-| `symlink` | Rewire symlinks to local path | Instant |
-| `hardlink` | Recreate hardlinks to local path | Instant |
-| `copy` | Set local path as source, require `dots sync` | Manual via `dots sync` |
+| Strategy   | Work mode behavior                            | Edit propagation       |
+| ---------- | --------------------------------------------- | ---------------------- |
+| `symlink`  | Rewire symlinks to local path                 | Instant                |
+| `hardlink` | Recreate hardlinks to local path              | Instant                |
+| `copy`     | Set local path as source, require `dots sync` | Manual via `dots sync` |
 
 ### The `dots sync` Command
 
@@ -548,12 +592,12 @@ Only relevant for `copy` strategy. No-op for symlink/hardlink. Compares checksum
 
 ### Strategies
 
-| Strategy  | Behavior |
-|-----------|----------|
+| Strategy  | Behavior                                        |
+| --------- | ----------------------------------------------- |
 | `append`  | Overlay content after base, with marker comment |
-| `prepend` | Overlay content before base |
-| `replace` | Overlay file wins entirely |
-| `merge`   | Deep merge for structured formats (v2) |
+| `prepend` | Overlay content before base                     |
+| `replace` | Overlay file wins entirely                      |
+| `merge`   | Deep merge for structured formats (v2)          |
 
 ### Marker Comments
 
@@ -579,6 +623,7 @@ $DOTS_STATE_DIR/merged/
 ## CLI Interface
 
 ### Init & Config
+
 ```
 dots init
 dots init --from <url> --path <dir>
@@ -588,6 +633,7 @@ dots doctor
 ```
 
 ### Taps
+
 ```
 dots tap add <n> <url> [--branch main]
 dots tap remove <n>
@@ -596,6 +642,7 @@ dots tap update [<n>]
 ```
 
 ### Install & Remove
+
 ```
 dots install <tap>/<package>
 dots install <tap>/<package> --dry-run
@@ -607,6 +654,7 @@ dots upgrade --all
 ```
 
 ### Work Mode
+
 ```
 dots work on <tap> <local-path>
 dots work off <tap>
@@ -615,6 +663,7 @@ dots rebuild [<tap>/<package>]
 ```
 
 ### Sync (Copy Strategy)
+
 ```
 dots sync [<tap>/<package>]
 dots sync --all
@@ -622,6 +671,7 @@ dots sync --watch
 ```
 
 ### Status & Inspection
+
 ```
 dots status
 dots list
@@ -634,6 +684,7 @@ dots which <file>
 ```
 
 ### Profiles
+
 ```
 dots profile create <n>
 dots profile delete <n>
@@ -648,6 +699,7 @@ dots profile import <file>
 ```
 
 ### Discovery
+
 ```
 dots search <query>
 dots browse <tap>
@@ -659,6 +711,7 @@ dots browse <tap>/<package>
 ## Lifecycle Scenarios
 
 ### Fresh machine — macOS
+
 ```bash
 brew install dots
 dots init --from git@github.com:me/dotfiles.git --path dots
@@ -667,6 +720,7 @@ dots work on personal ~/code/dotfiles
 ```
 
 ### Fresh machine — Windows
+
 ```powershell
 scoop install dots    # or winget, choco
 dots init --from git@github.com:me/dotfiles.git --path dots
@@ -677,6 +731,7 @@ dots work on personal C:\Users\me\code\dotfiles
 ```
 
 ### Fresh machine — WSL
+
 ```bash
 # WSL is Linux — same as any Linux setup
 sudo apt install dots   # or brew, cargo
@@ -685,6 +740,7 @@ dots profile apply work
 ```
 
 ### Adding a cross-platform package
+
 ```yaml
 # ~/code/dotfiles/git/Dotfile.yaml
 package:
@@ -714,6 +770,7 @@ platform:
 The `.gitconfig` link is the same everywhere — `$HOME/.gitconfig` on Unix, `%USERPROFILE%\.gitconfig` on Windows. Only the credential setup hook differs.
 
 ### Package that uses path aliases for portability
+
 ```yaml
 # ~/code/dotfiles/alacritty/Dotfile.yaml
 package:
@@ -741,6 +798,7 @@ platform:
 ```
 
 `@config/alacritty/alacritty.toml` resolves to:
+
 - macOS: `~/.config/alacritty/alacritty.toml`
 - Linux: `~/.config/alacritty/alacritty.toml`
 - Windows: `%APPDATA%\alacritty\alacritty.toml`
@@ -751,7 +809,7 @@ One manifest. No per-platform path juggling.
 
 ## Design Principles
 
-1. **XDG-native on Unix, platform-native on Windows.** Respect `XDG_CONFIG_HOME`/`XDG_STATE_HOME` on Unix. Use `%APPDATA%`/`%LOCALAPPDATA%` on Windows. WSL is Linux.
+1. **XDG-native on Unix, platform-native on Windows by default.** The default `@config`/`@data`/etc. aliases respect `XDG_CONFIG_HOME`/`XDG_STATE_HOME` on Unix and use `%APPDATA%`/`%LOCALAPPDATA%` on Windows. WSL is Linux. When this default is wrong, opt in explicitly: `@xdg-*` forces XDG everywhere (including Windows), and `@apple-*` reaches for Apple HIG locations under `~/Library` on darwin.
 
 2. **Self-bootstrapping.** dots manages its own config as a package. One command from bare machine to fully configured.
 
