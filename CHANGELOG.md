@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## v0.6.0 - 2026-04-30
+
+
+
+### Features
+- add XDG and Apple path-alias families for OS-specific dotfiles
+
+
+### Miscellaneous
+- drop v5 suffix from design spec filename
+
+
 ## v0.5.0 - 2026-04-29
 
 
