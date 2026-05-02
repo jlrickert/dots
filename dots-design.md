@@ -183,6 +183,25 @@ aliases:
   @scripts: @home/scripts
 ```
 
+### Reserved Aliases
+
+The built-in alias namespace is reserved. Custom aliases must not shadow a
+reserved name; doing so produces undefined behavior and a future release will
+reject the collision at config load.
+
+Reserved names today:
+
+- The default family: `@home`, `@config`, `@data`, `@cache`, `@state`, `@bin`.
+- The XDG family: every alias of the form `@xdg-*`.
+- The Apple family: every alias of the form `@apple-*`.
+- The artifact namespace: `@artifacts`, used by the artifact subsystem to
+  stage fetched bytes. See Path Aliases for resolution semantics.
+
+A configuration that defines a custom alias under one of these names is
+silently accepted today and the user binding wins. This is a transitional
+behavior — relying on it is unsupported. Pick a name that does not collide
+with any reserved family above.
+
 ### Path Separator Normalization
 
 Manifests always use forward slashes. dots normalizes to the platform-native separator at resolution time. You write `@config/nvim/init.lua` and dots resolves it to `%APPDATA%\nvim\init.lua` on Windows.
@@ -273,6 +292,91 @@ Work mode with copy strategy is slightly different from symlink mode:
 - Copy mode: `~/.config/nvim/init.lua` is a copy of `~/code/dotfiles/nvim/init.lua`
 
 With copies, you edit in `~/code/dotfiles/` and run `dots sync` to push changes to the targets. Or use `dots sync --watch` for automatic propagation.
+
+---
+
+## Artifacts
+
+### The Problem
+
+Some packages aren't pure source — they're binaries published as GitHub releases, language toolchains, or vendored archives. dots packages should be able to declare these as first-class dependencies, fetched once, content-addressed, cached, and staged into a predictable location that the rest of the manifest (`links:`, `hooks:`) can reference.
+
+### The `artifacts:` Block
+
+Each entry under `artifacts:` describes a single fetchable blob. The fetcher refuses any bytes whose SHA-256 does not match the declared hash, so source drift and corruption surface as errors rather than silent installs.
+
+```yaml
+package:
+  name: nvim
+
+artifacts:
+  - url: https://github.com/neovim/neovim/releases/download/v0.10.0/nvim-macos-arm64.tar.gz
+    sha256: 3f1d2e...c4a9
+    extract: tar.gz
+    strip_components: 1
+    stage: nvim
+    executables: [bin/nvim]
+
+links:
+  bin/nvim: "@artifacts/personal/nvim/nvim/bin/nvim"
+```
+
+| Field              | Required                    | Meaning                                                                                                                       |
+| ------------------ | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `url`              | yes                         | Source URL for the artifact bytes                                                                                             |
+| `sha256`           | yes                         | Hex digest; fetcher rejects any bytes that don't match                                                                        |
+| `extract`          | optional                    | Archive shape: omit (or `""`) for raw bytes, or one of `tar.gz`, `tar.xz`, `zip`                                              |
+| `strip_components` | optional, default `0`       | Drop this many leading path components from each archive entry (mirrors `tar --strip-components`)                             |
+| `stage`            | required when `extract: ""` | Directory or filename under `@artifacts/<tap>/<pkg>/` where bytes land. Defaults to a derived name when extracting an archive |
+| `executables`      | optional                    | Paths within the staged tree that should be marked executable on POSIX; informational on Windows                              |
+
+### Where Bytes Land
+
+Extracted bytes land under the `@artifacts` alias, namespaced by tap and package:
+
+```
+@artifacts/<tap>/<pkg>/<stage>/
+```
+
+Manifests reference staged paths through the same alias system used for `links:`. There is no special "artifact link" — once staged, the bytes are just files, and `links:` points into them like any other source.
+
+### Cache
+
+The fetcher caches every blob it downloads, keyed by content hash:
+
+```
+@cache/dots/artifacts/<sha256>.<ext>
+```
+
+Re-installing a package whose artifacts have not changed is a no-op against the network. The cache is content-addressed and append-only; entries are reclaimed by `dots cache prune`.
+
+### Per-Platform Overrides
+
+`artifacts:` participates in the same platform cascade as `links:` and `hooks:`. Platform-specific entries replace base entries by URL identity; entries unique to a platform block are appended.
+
+```yaml
+artifacts:
+  - url: https://example.com/tool-linux.tar.gz
+    sha256: aaaa...
+    extract: tar.gz
+    stage: tool
+
+platform:
+  darwin-arm64:
+    artifacts:
+      - url: https://example.com/tool-darwin-arm64.tar.gz
+        sha256: bbbb...
+        extract: tar.gz
+        stage: tool
+```
+
+The cascade order is identical to other manifest fields: base → OS → OS-arch.
+
+### Security
+
+- **`sha256` is required.** A manifest that omits the hash fails to load. This is non-negotiable: artifacts are remote bytes, and dots refuses to be a vector for silently swapped binaries.
+- **Archive traversal is mitigated.** Extraction rejects entries whose paths are absolute, contain parent-directory references, or symlink outside the stage root. Zip-slip and tar-slip are prevented at extraction time.
+- **TLS is required for `https://` URLs.** Plain `http://` is permitted but emits a warning during install.
 
 ---
 

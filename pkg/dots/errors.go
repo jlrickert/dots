@@ -8,13 +8,15 @@ import (
 
 // Sentinel errors for simple equality checks.
 var (
-	ErrInvalid          = os.ErrInvalid
-	ErrExist            = os.ErrExist
-	ErrNotExist         = os.ErrNotExist
-	ErrPermission       = os.ErrPermission
-	ErrParse            = errors.New("unable to parse")
-	ErrConflict         = errors.New("conflict")
-	ErrAliasUnavailable = errors.New("alias unavailable on this platform")
+	ErrInvalid            = os.ErrInvalid
+	ErrExist              = os.ErrExist
+	ErrNotExist           = os.ErrNotExist
+	ErrPermission         = os.ErrPermission
+	ErrParse              = errors.New("unable to parse")
+	ErrConflict           = errors.New("conflict")
+	ErrAliasUnavailable   = errors.New("alias unavailable on this platform")
+	ErrChecksumMismatch   = errors.New("artifact checksum mismatch")
+	ErrUnsupportedExtract = errors.New("unsupported extract format")
 )
 
 // TapNotFoundError is returned when a tap alias cannot be resolved.

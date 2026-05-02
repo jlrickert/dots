@@ -59,6 +59,11 @@
       "description": "Files to merge from multiple packages",
       "additionalProperties": { "type": "string" }
     },
+    "artifacts": {
+      "type": "array",
+      "description": "External binaries or archives to fetch, verify by SHA-256, and stage under @artifacts/<tap>/<pkg>/. See the Artifacts section of dots-design.md.",
+      "items": { "$ref": "#/definitions/artifact" }
+    },
     "platform": {
       "type": "object",
       "description": "Platform-specific overrides keyed by OS or OS-arch",
@@ -160,8 +165,52 @@
         },
         "link_strategy": {
           "$ref": "#/definitions/link_strategy"
+        },
+        "artifacts": {
+          "type": "array",
+          "description": "Platform-specific artifacts; participates in the same base → OS → OS-arch cascade as links and hooks.",
+          "items": { "$ref": "#/definitions/artifact" }
         }
       }
+    },
+    "artifact": {
+      "type": "object",
+      "description": "A single fetchable blob: source URL plus content hash, optionally extracted and staged under @artifacts/<tap>/<pkg>/.",
+      "required": ["url", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Source URL for the artifact bytes"
+        },
+        "sha256": {
+          "type": "string",
+          "description": "Content hash; fetcher rejects bytes that don't match",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "extract": {
+          "type": "string",
+          "description": "Archive shape; omit or set empty for raw bytes",
+          "enum": ["", "tar.gz", "tar.xz", "zip"]
+        },
+        "strip_components": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stage": {
+          "type": "string"
+        },
+        "executables": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "extract": { "const": "" } } },
+          "then": { "required": ["url", "sha256", "stage"] }
+        }
+      ]
     }
   }
 }

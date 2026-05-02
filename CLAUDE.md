@@ -30,7 +30,7 @@ go vet ./...
 
 - **`cmd/dots/`** — Binary entrypoint: `toolkit.NewRuntime()` → `cli.Run()`
 - **`pkg/cli/`** — Cobra command definitions bridging CLI flags to `pkg/dotsctl`. Each command in its own `cmd_*.go` file.
-- **`pkg/dots/`** — Core library: platform detection, path aliases, cascade merge, config/manifest parsing, repository interface, error types.
+- **`pkg/dots/`** — Core library: platform detection, path aliases, cascade merge, config/manifest parsing, repository interface, error types, and the artifact subsystem (`Artifact`, `Fetcher`/`HTTPFetcher`/`MemoryFetcher`, `Extractor` with zip-slip / tar-slip hardening). The fetcher and extractor route all FS I/O through `*toolkit.Runtime`; `HTTPFetcher` additionally takes an `*http.Client` because cli-toolkit does not yet expose an HTTP seam.
 - **`pkg/dotsctl/`** — Service layer: `Dots` struct composing `PathService`, `ConfigService`, and `Repository`. Each operation in its own `dots_*.go` file (file-per-operation pattern).
 
 ### Key Types and Flow
@@ -110,7 +110,7 @@ platform:
 
 ## Error Handling
 
-- Sentinel errors in `pkg/dots/errors.go`: `ErrNotExist`, `ErrExist`, `ErrParse`, `ErrConflict`.
+- Sentinel errors in `pkg/dots/errors.go`: `ErrNotExist`, `ErrExist`, `ErrParse`, `ErrConflict`, `ErrChecksumMismatch`, `ErrUnsupportedExtract`.
 - Typed errors: `TapNotFoundError`, `PackageNotFoundError`, `InvalidConfigError`.
 - Check with `errors.Is()` for sentinels, `errors.As()` for typed errors.
 - `TapNotFoundError` and `PackageNotFoundError` both satisfy `errors.Is(err, ErrNotExist)`.
