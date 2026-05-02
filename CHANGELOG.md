@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## v0.7.0 - 2026-05-02
+
+
+
+### Features
+- add artifact fetcher, extractor, and design surface
+
+
 ## v0.6.0 - 2026-04-30
 
 
