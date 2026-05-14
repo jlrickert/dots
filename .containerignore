@@ -1,0 +1,39 @@
+# Keep the build context tight. The Containerfile uses repo root as the
+# context so the multi-stage builder can `COPY . .` and build ./cmd/dots, and
+# so the fixture under containers/fixture/ is reachable.
+
+# VCS / IDE / editor noise.
+.git
+.github
+.idea
+.vscode
+.claude
+.task
+
+# Host-built dots binary at repo root — Mach-O on macOS hosts, useless in the
+# linux container. The builder stage rebuilds the binary cross-platform anyway.
+/dots
+
+# Go test/build artifacts.
+*.test
+*.out
+coverage.txt
+coverage.html
+/dist
+
+# Node / JS dep dirs (not used here, but keep the context tight in case
+# anyone vendors something locally).
+node_modules
+
+# Docs that don't affect the build.
+CHANGELOG.md
+README.md
+TASK.md
+
+# Editor / OS detritus.
+.DS_Store
+*.swp
+*.swo
+
+# Don't ship local Taskfile noise into the build context.
+Taskfile.local.yml

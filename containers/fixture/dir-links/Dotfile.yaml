@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+#
+# dir-links — exercises directory-mode link entries that the existing fixtures
+# do not cover. Three contracts:
+#
+#   1. Object form in links: map (vs the bare-string shorthand used by every
+#      other fixture).
+#   2. Explicit `mode: symlink` on a directory — produces a symlink-dir even
+#      under link_strategy: copy (which the dots-config bootstrap installs).
+#      Asserts that the manifest mode wins over the package strategy.
+#   3. `mode: copy` with `exclude` — confirms the segment-OR-full glob rule:
+#      `__pycache__` matches the directory wherever it appears (segment), and
+#      `*.pyc` matches any pyc file (suffix). Both should be pruned from the
+#      installed tree.
+#
+# Shell-basic already covers auto-mode + copy strategy on a directory (the
+# profile.d/ → ~/.config/profile.d/ leaf-copy path), so this package focuses
+# on the explicit-mode and exclude paths the linker grew.
+package:
+  name: dir-links
+  description: Fixture exercising explicit directory-link modes and exclude globs
+  version: 0.1.0
+  tags:
+    - dir-links
+    - links
+links:
+  # Explicit mode: symlink on a directory. Under dots-config's copy strategy
+  # auto-mode would emit per-leaf copies; the explicit mode forces one
+  # symlink at the dest root.
+  lua/:
+    target: '@config/dir-links/lua'
+    mode: symlink
+
+  # Explicit mode: copy with exclude globs. Walks the source tree, copies
+  # each regular file leaf, and prunes anything matching the patterns. The
+  # __pycache__ pattern is a single segment — the segment-OR-full rule means
+  # it matches the nested directory without forcing **/__pycache__.
+  factorizers/:
+    target: '@config/dir-links/factorizers'
+    mode: copy
+    exclude:
+      - __pycache__
+      - '*.pyc'

@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+#
+# platform-aware — exercises the platform: cascade. Inside the Linux test
+# image, only the linux block applies, so platform-aware-linux.txt should
+# land while platform-aware-darwin.txt should not. The base block applies on
+# every platform.
+package:
+  name: platform-aware
+  description: Fixture exercising the platform cascade (base + linux + darwin)
+  version: 0.1.0
+  tags:
+    - platform
+links:
+  base.txt: '@config/dots-test/platform-aware/base.txt'
+platform:
+  linux:
+    links:
+      linux.txt: '@config/dots-test/platform-aware/linux.txt'
+  darwin:
+    links:
+      darwin.txt: '@config/dots-test/platform-aware/darwin.txt'

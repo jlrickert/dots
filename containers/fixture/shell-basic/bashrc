@@ -1,0 +1,4 @@
+# shell-basic fixture bashrc — copied to ~/.bashrc by dots install.
+# The marker line below is grepped by verify.sh to confirm the right file
+# landed (not a stale leftover from the base ubuntu skeleton).
+export DOTS_TEST_SHELL_BASIC=1

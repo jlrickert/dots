@@ -1,0 +1,53 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  IMAGE_NAME: dots-test:dev
+
+tasks:
+  run: go run ./cmd/dots {{.CLI_ARGS}}
+  test:
+    cmds:
+      - go test ./pkg/... {{.CLI_ARGS}}
+    sources:
+      - ./pkg/**/*.go
+    silent: true
+  install:
+    desc: Install the dots CLI
+    cmds:
+      - go install ./cmd/dots
+    sources:
+      - cmd/**/*.go
+      - pkg/**/*.go
+  install:completion:
+    desc: Install the dots CLI and generate Zsh completions.
+    cmds:
+      - go install ./cmd/dots
+      - dots completion zsh > '{{env "HOME"}}/.cache/dotfiles/zsh/completions/_dots'
+    sources:
+      - cmd/**/*.go
+      - pkg/**/*.go
+  podman:build:
+    desc: "Build the dots-test:dev smoke image into local podman storage."
+    cmds:
+      - podman build -t {{.IMAGE_NAME}} .
+    sources:
+      - Taskfile.yml
+      - Containerfile
+      - .containerignore
+      - cmd/**/*.go
+      - pkg/**/*.go
+      - go.mod
+      - go.sum
+      - containers/**/*
+  podman:test:
+    desc: "Run the dots-test:dev smoke image (executes containers/verify.sh)."
+    deps: [podman:build]
+    cmds:
+      - podman run --rm {{.IMAGE_NAME}}
+  podman:shell:
+    desc: "Drop into a bash shell inside the dots-test:dev image (debug)."
+    deps: [podman:build]
+    cmds:
+      - podman run --rm -it --entrypoint bash {{.IMAGE_NAME}}

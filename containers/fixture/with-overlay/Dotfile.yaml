@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+#
+# with-overlay — exercises the overlay: block. Declares shell-basic as the
+# base layer and installs its own files (no link conflict with shell-basic).
+# At install time, dots records the overlay metadata in the lockfile; the
+# overlay merge itself is exercised by other code paths (overlay_test.go).
+# This fixture is here to prove the manifest parses, install records the
+# overlay layer, and dots list / dots status surface it without error.
+package:
+  name: with-overlay
+  description: Fixture exercising overlay metadata on top of shell-basic
+  version: 0.1.0
+  tags:
+    - overlay
+overlay:
+  base: '@self/shell-basic'
+  strategy: append
+  priority: 50
+links:
+  overlay-marker.txt: '@config/dots-test/with-overlay/marker.txt'

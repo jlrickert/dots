@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+#
+# shell-basic — exercises three contracts:
+#   1. links: file → ~/.bashrc            (regular-file link via copy strategy)
+#   2. links: directory → ~/.config/profile.d (auto-resolution on directory:
+#                                               with link_strategy=copy this
+#                                               walks the source and copies
+#                                               each leaf as a regular file)
+#   3. hooks: post_install                (writes a marker under ~/.local/state)
+package:
+  name: shell-basic
+  description: Minimal shell fixture exercising links + hooks + copy strategy
+  version: 0.1.0
+  tags:
+    - shell
+links:
+  bashrc: .bashrc
+  profile.d: '@config/profile.d'
+hooks:
+  post_install: hooks/post_install.sh

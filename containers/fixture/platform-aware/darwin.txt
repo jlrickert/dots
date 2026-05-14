@@ -1,0 +1,1 @@
+platform-aware darwin block — should NOT be installed inside the linux test image.

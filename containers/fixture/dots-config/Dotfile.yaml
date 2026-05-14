@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+package:
+  name: dots-config
+  description: Bootstrap package for the dots-test:dev fixture tap
+  version: 0.1.0
+  tags:
+    - dots
+    - meta
+links:
+  config.yaml: '@config/dots/config.yaml'

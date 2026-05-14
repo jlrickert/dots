@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dots-config.json
+#
+# Minimal dots config for the test image. link_strategy=copy lands installed
+# files as regular files (not symlinks), which exercises the copy path in the
+# linker and lets verify.sh assert with [ -f ].
+core:
+  conflict_strategy: prompt
+  backup: true
+  link_strategy: copy
