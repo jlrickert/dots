@@ -69,15 +69,11 @@ func (d *Dots) Install(ctx context.Context, opts InstallOptions) (*InstallResult
 	}
 
 	if opts.DryRun {
-		var files []dots.InstalledFile
-		for _, a := range actions {
-			files = append(files, dots.InstalledFile{
-				Src:    a.Src,
-				Dest:   a.Dest,
-				Method: string(a.Strategy),
-				Origin: a.Origin,
-			})
-		}
+		// Dry-run mirrors the real install flattening: directory entries
+		// expand to per-leaf rows so the user sees exactly what would be
+		// written. previewLinkLeaves is read-only — it stat-walks the
+		// source but never opens or writes a destination file.
+		files := previewLinkLeaves(actions)
 		return &InstallResult{
 			Package: opts.Package,
 			Files:   files,
@@ -101,18 +97,23 @@ func (d *Dots) Install(ctx context.Context, opts InstallOptions) (*InstallResult
 			return nil, err
 		}
 
-		result, err := dots.PlaceLink(action)
+		// PlaceLink now returns one or many results: a directory-copy
+		// emits one InstalledFile per leaf so existing remove/diff/which
+		// flows keep treating each as an independent unit.
+		results, err := dots.PlaceLink(action)
 		if err != nil {
 			return nil, fmt.Errorf("place link: %w", err)
 		}
 
-		installedFiles = append(installedFiles, dots.InstalledFile{
-			Src:      result.Src,
-			Dest:     result.Dest,
-			Method:   result.Method,
-			Checksum: result.Checksum,
-			Origin:   result.Origin,
-		})
+		for _, result := range results {
+			installedFiles = append(installedFiles, dots.InstalledFile{
+				Src:      result.Src,
+				Dest:     result.Dest,
+				Method:   result.Method,
+				Checksum: result.Checksum,
+				Origin:   result.Origin,
+			})
+		}
 	}
 
 	// Run post_install hook
@@ -273,10 +274,26 @@ func (d *Dots) hookRunner() *dots.HookRunner {
 // prepareDest clears dest in preparation for placing a new link. Regular
 // files and symlinks are backed up (when enabled) and removed; empty
 // directories are removed. A non-empty directory is treated as a user-data
-// conflict and aborts before any destructive action. Paths are touched
-// through d.Runtime so sandboxed callers stay inside their jail.
+// conflict and aborts before any destructive action.
+//
+// Filesystem inspection here uses os.Lstat / os.RemoveAll directly (not
+// d.Runtime.*) for two reasons:
+//
+//   - Symlink discrimination. os.Lstat does not follow symlinks; this is
+//     load-bearing for the upgrade path. A previously installed symlink-dir
+//     would otherwise be Stat-followed into the source package, causing
+//     prepareDest to ReadDir into source or report a spurious "non-empty
+//     directory at dest" error.
+//   - Path consistency with the placer. The downstream PlaceLink path uses
+//     raw os.Symlink / os.OpenFile against action.Dest, so prepareDest must
+//     inspect and clear that same physical path. Routing through the runtime
+//     would re-jail an already-jail-prefixed alias path in tests and silently
+//     no-op against a different location than PlaceLink writes to.
+//
+// Backups are still routed through the runtime — they're purely virtual-
+// state writes and the runtime is the right seam for them.
 func (d *Dots) prepareDest(ctx context.Context, dest string, shouldBackup bool) error {
-	info, err := d.Runtime.Stat(dest, false)
+	info, err := os.Lstat(dest)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -284,24 +301,149 @@ func (d *Dots) prepareDest(ctx context.Context, dest string, shouldBackup bool) 
 		return fmt.Errorf("stat %s: %w", dest, err)
 	}
 
+	// Symlink at dest: remove it without inspecting its target. The
+	// short-circuit before the IsDir branch is required for dir-symlinks
+	// — descending would walk into the source package (OsFS readdir
+	// follows symlinks), so without this we'd either stomp source or
+	// abort with a misleading "non-empty" error.
+	if info.Mode()&os.ModeSymlink != 0 {
+		if err := os.Remove(dest); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove existing %s: %w", dest, err)
+		}
+		return nil
+	}
+
 	if info.IsDir() {
-		entries, err := d.Runtime.ReadDir(dest)
+		entries, err := os.ReadDir(dest)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", dest, err)
 		}
 		if len(entries) > 0 {
 			return fmt.Errorf("destination %s is a non-empty directory; move or remove it to proceed", dest)
 		}
-	} else if shouldBackup {
-		if data, err := d.Runtime.ReadFile(dest); err == nil {
+		if err := os.Remove(dest); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove existing %s: %w", dest, err)
+		}
+		return nil
+	}
+
+	if shouldBackup {
+		if data, err := os.ReadFile(dest); err == nil {
 			_ = d.Repo.BackupFile(ctx, dest, data)
 		}
 	}
 
-	if err := d.Runtime.Remove(dest, true); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := os.Remove(dest); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove existing %s: %w", dest, err)
 	}
 	return nil
+}
+
+// previewLinkLeaves expands a slice of LinkActions into the flat
+// InstalledFile rows that PlaceLink would emit, without writing anything.
+// File actions become a single row keyed by Strategy. Directory actions
+// are resolved through the same Mode/Strategy table as PlaceLink:
+//
+//   - mode=symlink (or auto + symlink/hardlink strategy) → one
+//     "symlink-dir" row.
+//   - mode=copy (or auto + copy strategy) → one "copy-dir-leaf" row per
+//     regular file under the source, with Exclude applied.
+//
+// Best-effort: a missing or unreadable source surfaces as a single row
+// describing the action so dry-run still says something useful instead of
+// failing.
+func previewLinkLeaves(actions []dots.LinkAction) []dots.InstalledFile {
+	var files []dots.InstalledFile
+	for _, a := range actions {
+		if !a.IsDir {
+			files = append(files, dots.InstalledFile{
+				Src:    a.Src,
+				Dest:   a.Dest,
+				Method: string(a.Strategy),
+				Origin: a.Origin,
+			})
+			continue
+		}
+
+		mode := a.Mode
+		if mode == dots.LinkModeAuto {
+			switch a.Strategy {
+			case dots.LinkCopy:
+				mode = dots.LinkModeCopy
+			default:
+				mode = dots.LinkModeSymlink
+			}
+		}
+
+		if mode == dots.LinkModeSymlink {
+			files = append(files, dots.InstalledFile{
+				Src:    a.Src,
+				Dest:   a.Dest,
+				Method: "symlink-dir",
+				Origin: a.Origin,
+			})
+			continue
+		}
+
+		// LinkModeCopy: enumerate leaves the way placeDirCopy will.
+		leaves, err := previewCopyDirLeaves(a)
+		if err != nil || len(leaves) == 0 {
+			// Fall back to a single placeholder row so dry-run is never
+			// silent. Users can still see the dest root.
+			files = append(files, dots.InstalledFile{
+				Src:    a.Src,
+				Dest:   a.Dest,
+				Method: "copy-dir-leaf",
+				Origin: a.Origin,
+			})
+			continue
+		}
+		files = append(files, leaves...)
+	}
+	return files
+}
+
+// previewCopyDirLeaves walks the source directory and returns one
+// InstalledFile per regular file leaf that placeDirCopy would copy. It
+// applies the same exclude semantics so the dry-run row count matches the
+// real install row count.
+func previewCopyDirLeaves(a dots.LinkAction) ([]dots.InstalledFile, error) {
+	var leaves []dots.InstalledFile
+	err := filepath.WalkDir(a.Src, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(a.Src, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		if d.IsDir() {
+			if dots.MatchExclude(rel, a.Exclude) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		if dots.MatchExclude(rel, a.Exclude) {
+			return nil
+		}
+		leaves = append(leaves, dots.InstalledFile{
+			Src:    path,
+			Dest:   filepath.Join(a.Dest, rel),
+			Method: "copy-dir-leaf",
+			Origin: a.Origin,
+		})
+		return nil
+	})
+	return leaves, err
 }
 
 // splitPackageRef splits "tap/package" into (tap, package).

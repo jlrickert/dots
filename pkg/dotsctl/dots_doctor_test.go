@@ -140,6 +140,93 @@ func TestDoctor_WorkStateOrphan_FlagsUnregisteredTaps(t *testing.T) {
 	require.NotContains(t, c.Detail, "personal")
 }
 
+func TestDoctor_DirectoryLinks_FlagsDanglingSymlinkDir(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+
+	// Seed a lockfile entry pointing at a symlink-dir whose target doesn't
+	// exist on disk. We don't create the symlink itself — os.Stat on a
+	// non-existent path is exactly the dangling shape the check audits.
+	require.NoError(t, repo.WriteLockfile(ctx, &dots.Lockfile{
+		Installed: []dots.InstalledPackage{
+			{
+				Package: "personal/appdir",
+				Tap:     "personal",
+				Files: []dots.InstalledFile{
+					{
+						Src:    "/tmp/missing-source",
+						Dest:   "/tmp/dots-doctor-test/dangling-link",
+						Method: "symlink-dir",
+					},
+				},
+			},
+		},
+	}))
+
+	checks, err := d.Doctor(ctx)
+	require.NoError(t, err)
+
+	c := findCheck(t, checks, "directory links")
+	require.Equal(t, "warn", c.Status)
+	require.Contains(t, c.Detail, "dangling symlink-dir")
+	require.Contains(t, c.Detail, "personal/appdir")
+}
+
+// TestDoctor_DirectoryLinks_FlagsDriftedCopyDirLeaf mirrors the dangling-
+// symlink-dir test for the other failure shape `checkDirectoryLinks`
+// audits: a copy-dir-leaf whose on-disk sha256 has drifted from the
+// recorded checksum. We seed the lockfile + a matching on-disk file, then
+// rewrite the file and assert the drift surfaces in the check detail.
+func TestDoctor_DirectoryLinks_FlagsDriftedCopyDirLeaf(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+
+	// Place a real file at the recorded dest and capture its checksum so
+	// the lockfile entry agrees with on-disk state at seed time.
+	leafDest := filepath.Join(t.TempDir(), "appdir-leaf", "main.py")
+	require.NoError(t, os.MkdirAll(filepath.Dir(leafDest), 0o755))
+	require.NoError(t, os.WriteFile(leafDest, []byte("main"), 0o644))
+	cs, err := dots.FileChecksum(leafDest)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.WriteLockfile(ctx, &dots.Lockfile{
+		Installed: []dots.InstalledPackage{
+			{
+				Package: "personal/appdir",
+				Tap:     "personal",
+				Files: []dots.InstalledFile{
+					{
+						Src:      "/tmp/source/main.py",
+						Dest:     leafDest,
+						Method:   "copy-dir-leaf",
+						Checksum: cs,
+					},
+				},
+			},
+		},
+	}))
+
+	// Sanity: a doctor run before drift should not flag this entry.
+	checks, err := d.Doctor(ctx)
+	require.NoError(t, err)
+	pre := findCheck(t, checks, "directory links")
+	require.Equal(t, "ok", pre.Status,
+		"pre-drift state should be clean; got: %s", pre.Detail)
+
+	// User edits the leaf in place — the recorded checksum no longer matches.
+	require.NoError(t, os.WriteFile(leafDest, []byte("user-edit"), 0o644))
+
+	checks, err = d.Doctor(ctx)
+	require.NoError(t, err)
+
+	c := findCheck(t, checks, "directory links")
+	require.Equal(t, "warn", c.Status)
+	require.Contains(t, c.Detail, "drifted copy-dir-leaf")
+	require.Contains(t, c.Detail, "personal/appdir")
+	require.Contains(t, c.Detail, leafDest,
+		"detail must identify the drifted leaf path")
+}
+
 func TestDoctor_WorkStatePath_FlagsMissingPaths(t *testing.T) {
 	d, _ := newTestDots(t)
 

@@ -89,7 +89,11 @@ func (d *Dots) Diff(ctx context.Context, pkgRef string) ([]DiffEntry, error) {
 
 	var diffs []DiffEntry
 	for _, f := range installed.Files {
-		if f.Method != "copy" {
+		// Drift detection only applies to checksummed copies. "copy" is
+		// the file-source path; "copy-dir-leaf" is the directory-mode
+		// per-leaf path — both record a sha256 in InstalledFile and can
+		// drift when the user edits the destination directly.
+		if f.Method != "copy" && f.Method != "copy-dir-leaf" {
 			continue
 		}
 		srcChecksum, err := dots.FileChecksum(f.Src)

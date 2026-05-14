@@ -81,8 +81,85 @@ func (d *Dots) Doctor(ctx context.Context) ([]DoctorCheck, error) {
 	checks = append(checks, d.checkMergeConflictMarkers())
 	checks = append(checks, d.checkWorkStateOrphan())
 	checks = append(checks, d.checkWorkStatePath())
+	checks = append(checks, d.checkDirectoryLinks(ctx))
 
 	return checks, nil
+}
+
+// checkDirectoryLinks audits installed directory-mode entries for two
+// failure shapes:
+//
+//   - symlink-dir whose target no longer resolves (broken symlink, target
+//     deleted from the tap or work-mode checkout).
+//   - copy-dir-leaf whose destination's sha256 has drifted from the
+//     recorded checksum (user edited the placed file in-tree).
+//
+// Returns "ok" when all directory-mode rows match their recorded state.
+// Missing lockfile is "ok" — there's nothing installed to audit.
+func (d *Dots) checkDirectoryLinks(ctx context.Context) DoctorCheck {
+	lockfile, err := d.Repo.ReadLockfile(ctx)
+	if err != nil {
+		if isNotExist(err) {
+			return DoctorCheck{
+				Name:   "directory links",
+				Status: "ok",
+				Detail: "no lockfile (nothing installed)",
+			}
+		}
+		return DoctorCheck{
+			Name:   "directory links",
+			Status: "error",
+			Detail: fmt.Sprintf("read lockfile: %v", err),
+		}
+	}
+
+	var dangling []string
+	var drifted []string
+	for _, pkg := range lockfile.Installed {
+		for _, f := range pkg.Files {
+			switch f.Method {
+			case "symlink-dir":
+				if _, err := os.Stat(f.Dest); err != nil {
+					dangling = append(dangling, fmt.Sprintf("%s -> %s", pkg.Package, f.Dest))
+				}
+			case "copy-dir-leaf":
+				if f.Checksum == "" {
+					continue
+				}
+				cs, err := dots.FileChecksum(f.Dest)
+				if err != nil {
+					drifted = append(drifted, fmt.Sprintf("%s -> %s (missing)", pkg.Package, f.Dest))
+					continue
+				}
+				if cs != f.Checksum {
+					drifted = append(drifted, fmt.Sprintf("%s -> %s", pkg.Package, f.Dest))
+				}
+			}
+		}
+	}
+
+	if len(dangling) == 0 && len(drifted) == 0 {
+		return DoctorCheck{
+			Name:   "directory links",
+			Status: "ok",
+			Detail: "all directory-mode entries resolve and match",
+		}
+	}
+
+	var parts []string
+	if len(dangling) > 0 {
+		sort.Strings(dangling)
+		parts = append(parts, "dangling symlink-dir: "+strings.Join(dangling, ", "))
+	}
+	if len(drifted) > 0 {
+		sort.Strings(drifted)
+		parts = append(parts, "drifted copy-dir-leaf: "+strings.Join(drifted, ", "))
+	}
+	return DoctorCheck{
+		Name:   "directory links",
+		Status: "warn",
+		Detail: strings.Join(parts, "; "),
+	}
 }
 
 // checkWorkStateFile verifies the work state file is absent or parses cleanly.

@@ -206,6 +206,40 @@ with any reserved family above.
 
 Manifests always use forward slashes. dots normalizes to the platform-native separator at resolution time. You write `@config/nvim/init.lua` and dots resolves it to `%APPDATA%\nvim\init.lua` on Windows.
 
+### Directory Entries
+
+Link entries can target directories as well as files. Each entry in `links:` accepts two YAML shapes:
+
+- **String shorthand** — `src: target`. The historical form. Files follow the package's `link_strategy`. Bare-string entries that resolve to a directory at install time auto-symlink, or auto-copy if `link_strategy: copy` is in effect.
+- **Object form** — `src: {target, mode, exclude}`. Use this when a directory needs explicit copy semantics with excludes, or to make the directory-symlink intent explicit at the manifest level.
+
+```yaml
+links:
+  # File: follows link_strategy.
+  init.lua: @config/nvim/init.lua
+
+  # Directory shorthand: auto-symlinks under symlink strategy.
+  lua/: @config/nvim/lua/
+
+  # Directory with explicit copy + excludes.
+  factorizers/:
+    target: @config/poststone/factorizers/
+    mode: copy
+    exclude: ["__pycache__", "*.pyc"]
+```
+
+`mode` is one of:
+
+- `auto` (default) — resolves at install time. Symlink or hardlink strategy → one symlink at the directory root. Copy strategy → recursive per-leaf copy.
+- `symlink` — always one symlink at the directory root. Cheap, instant edit propagation, but the application can write back into the package source. Use only when you trust the application not to scribble.
+- `copy` — recursive per-leaf copy with sha256 per file. `exclude` patterns are honored. `dots remove` cleans every leaf and prunes empty parent directories bottom-up. `dots diff` flags drifted leaves. The destination is independent of the source — edits don't propagate without `dots sync`.
+
+`exclude` patterns use `path/filepath.Match` semantics and match either the full source-relative path or any single path segment along the way, so `__pycache__` matches every nested cache directory without forcing `**/__pycache__`.
+
+**Directory symlink footgun:** a symlinked configuration directory means the application writes back into the tap. Tools that maintain caches, lockfiles, or session state inside their config directory will modify the source. Use `mode: copy` (or move state files outside the linked directory) when this matters.
+
+The `hardlink` strategy degrades to `symlink-dir` for directory sources with a stderr warning — hardlinks can't span directories.
+
 ---
 
 ## Link Strategy
@@ -548,6 +582,11 @@ package:
 
 links: # required — source: target
   source-path: target-path # target can use @aliases or raw paths
+  # Object form for directories that need explicit copy + excludes:
+  source-dir/:
+    target: target-path
+    mode: auto | symlink | copy # default: auto
+    exclude: [glob, ...] # only honored when the materialized mode is copy
 
 hooks:
   pre_install: script-path

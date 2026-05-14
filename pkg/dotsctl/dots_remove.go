@@ -56,16 +56,38 @@ func (d *Dots) Remove(ctx context.Context, opts RemoveOptions) error {
 		}
 	}
 
-	// Remove placed files and restore backups
+	// Remove placed files and restore backups.
+	//
+	// Method-aware deletion:
+	//   - "symlink-dir" → single os.Remove (works on the symlink itself,
+	//     never recurses into the source).
+	//   - "copy-dir-leaf" → per-leaf file removal, then a best-effort
+	//     bottom-up empty-dir prune so the destination tree disappears
+	//     when the package owned every file in it.
+	//   - All other methods → single-file remove (legacy path).
+	//
+	// Backups are not restored for directory entries: a "symlink-dir"
+	// has no per-file backup, and "copy-dir-leaf" rows aren't backed up
+	// individually by prepareDest (they're created under a fresh dest dir).
 	cfg, _ := d.ConfigService.Config(true)
 	shouldBackup := cfg.Core.Backup == nil || *cfg.Core.Backup
 
 	for _, f := range installed.Files {
 		_ = dots.RemoveLink(f.Dest)
 
-		if shouldBackup {
-			if data, err := d.Repo.RestoreFile(ctx, f.Dest); err == nil {
-				_ = dots.RestoreFileFromBackup(f.Dest, data)
+		switch f.Method {
+		case "copy-dir-leaf":
+			// Best-effort bottom-up cleanup. Stops at the first
+			// non-empty parent — siblings owned by the user or another
+			// package keep the directory alive.
+			dots.PruneEmptyParents(f.Dest, "")
+		case "symlink-dir":
+			// Already removed by RemoveLink above. No backup to restore.
+		default:
+			if shouldBackup {
+				if data, err := d.Repo.RestoreFile(ctx, f.Dest); err == nil {
+					_ = dots.RestoreFileFromBackup(f.Dest, data)
+				}
 			}
 		}
 	}

@@ -46,8 +46,16 @@ func newInfoCmd(deps *Deps) *cobra.Command {
 			if result.Manifest != nil {
 				if len(result.Manifest.Links) > 0 {
 					fmt.Fprintln(out, "Links:")
-					for src, dest := range result.Manifest.Links {
-						fmt.Fprintf(out, "  %s -> %s\n", src, dest)
+					for src, spec := range result.Manifest.Links {
+						// Print the target only when mode is auto so the
+						// common case stays compact; annotate explicit
+						// modes so readers see why a directory entry is
+						// being copied vs symlinked.
+						if spec.Mode == "" {
+							fmt.Fprintf(out, "  %s -> %s\n", src, spec.Target)
+						} else {
+							fmt.Fprintf(out, "  %s -> %s [mode=%s]\n", src, spec.Target, spec.Mode)
+						}
 					}
 				}
 			}

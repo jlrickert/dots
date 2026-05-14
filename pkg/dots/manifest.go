@@ -22,10 +22,85 @@ const (
 	SelfTapPrefix = "@self/"
 )
 
+// LinkMode discriminates how a directory link entry is materialized at the
+// destination. The empty value (LinkModeAuto) defers to the resolved
+// LinkStrategy at link time. For file sources the mode is ignored — files
+// follow the package's LinkStrategy as before.
+type LinkMode string
+
+const (
+	// LinkModeAuto is the default mode. For directory sources it resolves to
+	// symlink or copy based on the resolved LinkStrategy at link time.
+	LinkModeAuto LinkMode = ""
+	// LinkModeSymlink forces a single symlink at the directory root.
+	LinkModeSymlink LinkMode = "symlink"
+	// LinkModeCopy forces a recursive per-leaf copy.
+	LinkModeCopy LinkMode = "copy"
+)
+
+// LinkSpec is a single entry in a manifest's links: map. It accepts two YAML
+// shapes:
+//
+//   - String shorthand: `src: target` parses as LinkSpec{Target: target,
+//     Mode: LinkModeAuto}. This is the historical shape and remains the
+//     dominant form. Bare-string entries that resolve to a directory at link
+//     time auto-symlink (or auto-copy, depending on LinkStrategy).
+//   - Object form: `src: {target: ..., mode: symlink|copy|auto, exclude: [glob, ...]}`.
+//     Use this when a directory needs explicit copy semantics with excludes,
+//     or when documenting the intent of an auto-symlink-on-directory entry.
+//
+// Unknown modes are rejected at parse time as ErrParse.
+type LinkSpec struct {
+	// Target is the destination path. Supports @alias prefixes and raw
+	// home-relative paths. Required for both shapes.
+	Target string `yaml:"target"`
+	// Mode is the link discriminator; empty means LinkModeAuto.
+	Mode LinkMode `yaml:"mode,omitempty"`
+	// Exclude is a list of filepath.Match globs applied during recursive
+	// directory copies (LinkModeCopy on directory sources). Patterns match
+	// against any path segment or the full source-relative path; document the
+	// rule in matchExclude in linker.go.
+	Exclude []string `yaml:"exclude,omitempty"`
+}
+
+// UnmarshalYAML implements custom decoding for LinkSpec so the links: map
+// supports both the string shorthand and the object form. Anything else is
+// rejected as ErrParse with the source location attached.
+func (s *LinkSpec) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		// String shorthand. Mode is left as LinkModeAuto so the linker can
+		// resolve it once the source's directory-ness is known.
+		s.Target = node.Value
+		s.Mode = LinkModeAuto
+		return nil
+	case yaml.MappingNode:
+		// Use a private alias to avoid recursion through this UnmarshalYAML.
+		type rawLinkSpec LinkSpec
+		var raw rawLinkSpec
+		if err := node.Decode(&raw); err != nil {
+			return fmt.Errorf("%w: link entry at line %d: %v", ErrParse, node.Line, err)
+		}
+		if raw.Target == "" {
+			return fmt.Errorf("%w: link entry at line %d: target is required", ErrParse, node.Line)
+		}
+		switch raw.Mode {
+		case LinkModeAuto, LinkModeSymlink, LinkModeCopy:
+			// ok
+		default:
+			return fmt.Errorf("%w: link entry at line %d: invalid mode %q (want auto, symlink, or copy)", ErrParse, node.Line, raw.Mode)
+		}
+		*s = LinkSpec(raw)
+		return nil
+	default:
+		return fmt.Errorf("%w: link entry at line %d: expected string or mapping", ErrParse, node.Line)
+	}
+}
+
 // Manifest represents a parsed Dotfile.yaml package manifest.
 type Manifest struct {
 	Package  ManifestPackage          `yaml:"package"`
-	Links    map[string]string        `yaml:"links,omitempty"`
+	Links    map[string]LinkSpec      `yaml:"links,omitempty"`
 	Hooks    ManifestHooks            `yaml:"hooks,omitempty"`
 	Overlay  *ManifestOverlay         `yaml:"overlay,omitempty"`
 	Merge    map[string]string        `yaml:"merge,omitempty"`
@@ -62,13 +137,13 @@ type ManifestOverlay struct {
 
 // PlatformBlock holds platform-specific overrides within a manifest.
 type PlatformBlock struct {
-	Links        map[string]string `yaml:"links,omitempty"`
-	Hooks        ManifestHooks     `yaml:"hooks,omitempty"`
-	Requires     []string          `yaml:"requires,omitempty"`
-	Tags         []string          `yaml:"tags,omitempty"`
-	Overlay      *ManifestOverlay  `yaml:"overlay,omitempty"`
-	Merge        map[string]string `yaml:"merge,omitempty"`
-	LinkStrategy LinkStrategy      `yaml:"link_strategy,omitempty"`
+	Links        map[string]LinkSpec `yaml:"links,omitempty"`
+	Hooks        ManifestHooks       `yaml:"hooks,omitempty"`
+	Requires     []string            `yaml:"requires,omitempty"`
+	Tags         []string            `yaml:"tags,omitempty"`
+	Overlay      *ManifestOverlay    `yaml:"overlay,omitempty"`
+	Merge        map[string]string   `yaml:"merge,omitempty"`
+	LinkStrategy LinkStrategy        `yaml:"link_strategy,omitempty"`
 }
 
 // ParseManifest parses a Manifest from YAML bytes.
@@ -86,7 +161,7 @@ func ParseManifest(data []byte) (*Manifest, error) {
 // ResolvedManifest is the effective manifest after platform cascade resolution.
 type ResolvedManifest struct {
 	Package      ManifestPackage
-	Links        map[string]string
+	Links        map[string]LinkSpec
 	Hooks        ManifestHooks
 	Overlay      *ManifestOverlay
 	Merge        map[string]string
@@ -98,7 +173,7 @@ type ResolvedManifest struct {
 func ResolveManifest(m *Manifest, p Platform) *ResolvedManifest {
 	r := &ResolvedManifest{
 		Package:      m.Package,
-		Links:        copyStringMap(m.Links),
+		Links:        copyLinkMap(m.Links),
 		Hooks:        m.Hooks,
 		Overlay:      m.Overlay,
 		Merge:        copyStringMap(m.Merge),
@@ -185,6 +260,24 @@ func copyStringMap(m map[string]string) map[string]string {
 	cp := make(map[string]string, len(m))
 	for k, v := range m {
 		cp[k] = v
+	}
+	return cp
+}
+
+// copyLinkMap returns a deep copy of a links map. LinkSpec.Exclude is
+// duplicated so callers can safely mutate the result without aliasing the
+// source manifest's slices.
+func copyLinkMap(m map[string]LinkSpec) map[string]LinkSpec {
+	if m == nil {
+		return make(map[string]LinkSpec)
+	}
+	cp := make(map[string]LinkSpec, len(m))
+	for k, v := range m {
+		spec := LinkSpec{Target: v.Target, Mode: v.Mode}
+		if len(v.Exclude) > 0 {
+			spec.Exclude = append([]string(nil), v.Exclude...)
+		}
+		cp[k] = spec
 	}
 	return cp
 }

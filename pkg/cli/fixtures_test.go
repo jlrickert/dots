@@ -36,7 +36,7 @@ func TestFixture_ManifestResolve(t *testing.T) {
 
 	p := dots.Platform{OS: "darwin", Arch: "arm64"}
 	r := dots.ResolveManifest(m, p)
-	require.Equal(t, "@config/nvim/lua/clipboard.lua", r.Links["helpers/mac-clipboard.lua"])
+	require.Equal(t, "@config/nvim/lua/clipboard.lua", r.Links["helpers/mac-clipboard.lua"].Target)
 	require.Equal(t, "scripts/install-plugins-mac.sh", r.Hooks.PostInstall)
 }
 
