@@ -4,7 +4,33 @@ A brew-style dotfile package manager with taps, profiles, overlays, and cross-pl
 
 ## Installation
 
-### Homebrew (macOS and Linux)
+### Linux (recommended)
+
+```bash
+curl -fsSL https://github.com/jlrickert/dots/releases/latest/download/install.sh | bash
+```
+
+Installs the `dots` binary to `~/.local/bin/dots`. The script verifies the release archive's SHA-256 against `checksums.txt` from the same release. If `~/.local/bin` is not on your `$PATH`, the installer prints a shell-specific line to paste into your rc file.
+
+Pin a specific version:
+
+```bash
+curl -fsSL https://github.com/jlrickert/dots/releases/latest/download/install.sh | bash -s -- --version v0.7.0
+```
+
+Uninstall:
+
+```bash
+curl -fsSL https://github.com/jlrickert/dots/releases/latest/download/install.sh | bash -s -- --uninstall
+```
+
+Fallback URL (tracks `main` directly; use the release URL above when possible):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jlrickert/dots/main/scripts/install.sh | bash
+```
+
+### macOS (recommended)
 
 ```bash
 brew install jlrickert/formulae/dots
@@ -24,6 +50,22 @@ If needed, add your Go bin directory to `PATH`:
 
 ```bash
 export PATH="$(go env GOPATH)/bin:$PATH"
+```
+
+### Distro packages (advanced)
+
+For users who prefer system package managers. Both formats install the binary at `/usr/bin/dots`, shell completions for bash/zsh/fish, and man pages. Download the appropriate package from the [latest release](https://github.com/jlrickert/dots/releases/latest).
+
+**Debian / Ubuntu** — pulls in `git` as a runtime dependency:
+
+```bash
+sudo dpkg -i dots_<version>_<arch>.deb
+```
+
+**RHEL / Fedora / openSUSE**:
+
+```bash
+sudo rpm -i dots-<version>-<arch>.rpm
 ```
 
 ### Precompiled binaries
