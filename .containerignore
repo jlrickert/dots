@@ -20,12 +20,17 @@
 coverage.txt
 coverage.html
 /dist
+# But keep .deb artifacts under dist/ in the context — the BUILD_FROM=deb
+# variant of the Containerfile installs from them.
+!/dist/*.deb
 
 # Node / JS dep dirs (not used here, but keep the context tight in case
 # anyone vendors something locally).
 node_modules
 
-# Docs that don't affect the build.
+# Docs that don't affect the build. README.md is referenced via COPY in the
+# Containerfile (currently unused), so leave it ignored — adjust if a future
+# stage starts depending on it.
 CHANGELOG.md
 README.md
 TASK.md

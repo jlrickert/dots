@@ -4,6 +4,7 @@ version: "3"
 
 vars:
   IMAGE_NAME: dots-test:dev
+  IMAGE_NAME_DEB: dots-test:deb
 
 tasks:
   run: go run ./cmd/dots {{.CLI_ARGS}}
@@ -28,6 +29,10 @@ tasks:
     sources:
       - cmd/**/*.go
       - pkg/**/*.go
+  package:deb:
+    desc: "Build .deb artifacts locally via goreleaser snapshot mode (no publish)."
+    cmds:
+      - goreleaser release --snapshot --clean --skip=publish
   podman:build:
     desc: "Build the dots-test:dev smoke image into local podman storage."
     cmds:
@@ -51,3 +56,13 @@ tasks:
     deps: [podman:build]
     cmds:
       - podman run --rm -it --entrypoint bash {{.IMAGE_NAME}}
+  podman:build:deb:
+    desc: "Build the dots-test image from the .deb produced by `task package:deb`."
+    deps: [package:deb]
+    cmds:
+      - podman build --build-arg BUILD_FROM=deb -t {{.IMAGE_NAME_DEB}} .
+  podman:test:deb:
+    desc: "Run the dots-test image built from the .deb (executes containers/verify.sh)."
+    deps: [podman:build:deb]
+    cmds:
+      - podman run --rm {{.IMAGE_NAME_DEB}}

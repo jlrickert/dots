@@ -2,46 +2,53 @@
 #
 # dots-test:dev — fresh-Containerfile smoke harness for the dots CLI.
 #
-# Stage layout:
-#   1. builder       — pin go1.25-bookworm, CGO_ENABLED=0 build of ./cmd/dots.
-#   2. runtime       — ubuntu:24.04 base, locale, apt tooling, dots binary,
-#                      tester user, fixture COPY + snapshot commit, init/install,
-#                      verify entrypoint.
+# Stage layout (selected by --build-arg BUILD_FROM=source|deb, default source):
+#   builder         — pin go1.25-bookworm, CGO_ENABLED=0 build of ./cmd/dots.
+#                     Only consumed by dots-from-source.
+#   dots-base       — ubuntu:24.04, apt tooling + locale. Shared by both
+#                     variants.
+#   dots-from-source — drop the freshly-built binary at /usr/local/bin and
+#                     emit completions via `dots completion`.
+#   dots-from-deb   — `apt install /tmp/dist/dots_*_${ARCH}.deb`. Exercises
+#                     the packaging pipeline produced by `task package:deb`.
+#   runtime         — picks dots-from-source or dots-from-deb based on
+#                     BUILD_FROM, then layers on the bash/zsh completion
+#                     bootstrap, the tester user, the fixture, and runs
+#                     dots init/install. Entrypoint = verify.sh.
 #
-# Build:  podman build -t dots-test:dev .
+# Build (default, source variant):
+#   podman build -t dots-test:dev .
+# Build (deb variant — requires `task package:deb` first):
+#   podman build --build-arg BUILD_FROM=deb -t dots-test:deb .
 # Run:    podman run --rm dots-test:dev
 # Debug:  podman run --rm -it --entrypoint bash dots-test:dev
 #
 # Build context = repo root. The .containerignore at repo root keeps the
-# context tight. The `# syntax=` directive above is a BuildKit comment and is
-# ignored by buildah/podman — leaving it in keeps the file portable across
-# engines.
+# context tight; it makes a narrow exception for /dist/*.deb so the deb
+# variant can find its package.
 
-# ---------- Stage 1: build the dots binary ----------
+ARG BUILD_FROM=source
+
+# ---------- Stage: build the dots binary (source variant only) ----------
 FROM golang:1.25-bookworm AS builder
 
 WORKDIR /src
 
-# Cache go module downloads on go.sum changes.
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Bring in the rest of the source tree.
 COPY . .
 
-# CGO_ENABLED=0 produces a static binary that runs on the slim ubuntu:24.04
-# runtime stage without needing libc symbols beyond what the base ships.
 RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/dots ./cmd/dots \
     && /out/dots --version
 
-# ---------- Stage 2: runtime image ----------
-FROM ubuntu:24.04
+# ---------- Stage: shared runtime base ----------
+FROM ubuntu:24.04 AS dots-base
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=America/Chicago
 
-# Apt layer: shells, git, certs, sudo, locale data. No build-essential — the
-# binary is built in the builder stage and copied in. tzdata reads $TZ during
+# Apt layer: shells, git, certs, sudo, locale data. tzdata reads $TZ during
 # postinst under noninteractive frontend, so /etc/localtime + /etc/timezone
 # get configured without dpkg-reconfigure.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -59,30 +66,50 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8
 
-# Pull in the binary built in stage 1.
-COPY --from=builder /out/dots /usr/local/bin/dots
-RUN dots --version
+# ---------- Stage: source-built dots ----------
+# Drops the binary from the builder stage at /usr/local/bin/dots and emits
+# completions by invoking `dots completion <shell>`. Mirrors what the
+# Homebrew formula does.
+FROM dots-base AS dots-from-source
 
-# Preload tab completion for both shells.
-#
-# bash: drop the Cobra-generated script in /etc/bash_completion.d/. Ubuntu
-# 24.04 ships /etc/bash.bashrc with the bash-completion bootstrap block
-# COMMENTED OUT — the package now relies on /etc/profile.d/bash_completion.sh,
-# which only runs for *login* shells. Interactive non-login bash (`bash -i`,
-# `podman run -it --entrypoint bash`) never sources it. We append an
-# uncommented copy so interactive bash, login or not, picks up the
-# completion engine and then autoloads /etc/bash_completion.d/dots.
-#
-# zsh: drop _dots into /usr/share/zsh/vendor-completions/ — this is on the
-# default $fpath (`zsh -c 'echo $fpath'`) but Ubuntu's zsh-common does not
-# pre-create it, so mkdir -p first. Ubuntu ships no default /etc/zsh/zshrc,
-# so write a minimal one that runs compinit (with -u so insecure-directory
-# warnings don't fail interactive sessions — fine for a smoke harness).
-RUN mkdir -p /usr/share/zsh/vendor-completions \
+COPY --from=builder /out/dots /usr/local/bin/dots
+RUN dots --version \
+    && mkdir -p /usr/share/zsh/vendor-completions \
     && dots completion bash > /etc/bash_completion.d/dots \
     && dots completion zsh > /usr/share/zsh/vendor-completions/_dots \
-    && chmod 0644 /etc/bash_completion.d/dots /usr/share/zsh/vendor-completions/_dots \
-    && printf '\n%s\n' \
+    && chmod 0644 /etc/bash_completion.d/dots /usr/share/zsh/vendor-completions/_dots
+
+# ---------- Stage: .deb-installed dots ----------
+# Installs the .deb produced by `task package:deb`. The .deb itself drops the
+# binary at /usr/bin/dots and ships completions + man pages — no manual
+# completion emission needed.
+FROM dots-base AS dots-from-deb
+
+# .containerignore excludes /dist but negates /dist/*.deb so this COPY only
+# brings in the .deb artifacts, not the rest of the goreleaser output.
+COPY dist/ /tmp/dist/
+RUN ARCH="$(dpkg --print-architecture)" \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends /tmp/dist/dots_*_${ARCH}.deb \
+    && rm -rf /var/lib/apt/lists/* /tmp/dist \
+    && dots --version
+
+# ---------- Stage: runtime ----------
+# Final image. BUILD_FROM picks which intermediate provides the dots binary
+# and completion scripts; everything below this point is identical across
+# variants.
+FROM dots-from-${BUILD_FROM} AS runtime
+
+# bash: append an uncommented bash-completion bootstrap. Ubuntu 24.04 ships
+# /etc/bash.bashrc with the equivalent block commented out — the package
+# relies on /etc/profile.d/bash_completion.sh, which only runs for *login*
+# shells. Interactive non-login bash (`bash -i`, `podman run -it`) never
+# sources it.
+#
+# zsh: write a minimal /etc/zsh/zshrc that runs compinit so the completion
+# scripts on $fpath are picked up. -u suppresses insecure-directory warnings
+# for the smoke harness.
+RUN printf '\n%s\n' \
         '# Enable bash-completion in interactive shells. Ubuntu 24.04 ships' \
         '# the equivalent block commented out and relies on a profile.d hook' \
         '# that only runs for login shells, so interactive non-login bash' \
