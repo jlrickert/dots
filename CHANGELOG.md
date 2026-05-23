@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## v0.8.0 - 2026-05-23
+
+
+
+### Features
+- add directory-mode link entries with copy/symlink/auto
+- add podman smoke-test harness with fixture taps
+- add one-line installer and Linux distro packages
+- add gendocs generator for man pages and shell completions
+- build smoke image from .deb in addition to source
+- honor hook script shebangs when dispatching package hooks
+
+
+### Testing
+- cover hook shebang dispatch in the smoke image
+
+
 ## v0.7.0 - 2026-05-02
 
 
