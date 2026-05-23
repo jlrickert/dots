@@ -83,7 +83,7 @@ jobs:
           config: cliff.toml
           args: --tag ${{ steps.version.outputs.version }} -o CHANGELOG.md
 
-      - name: Commit changelog and create tag
+      - name: Commit changelog and create tag locally
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           git config user.name "github-actions[bot]"
@@ -91,7 +91,6 @@ jobs:
           git add CHANGELOG.md
           git commit -m "chore: release $VERSION" || echo "No changelog changes to commit"
           git tag -a "$VERSION" -m "$VERSION"
-          git push origin HEAD:main --follow-tags
 
       - name: Ensure clean git state for goreleaser
         run: |
@@ -109,3 +108,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+      - name: Push release commit and tag
+        run: git push origin HEAD:main --follow-tags
