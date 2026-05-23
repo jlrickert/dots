@@ -1,6 +1,9 @@
 // Command gendocs emits shell completions and a man page for dots into
-// dist/completions and dist/man. Invoked from .goreleaser.yaml's before.hooks
-// so the resulting files can be packaged into the .deb produced by nfpm.
+// assets/completions and assets/man. Invoked from .goreleaser.yaml's
+// before.hooks so the resulting files can be packaged into the .deb
+// produced by nfpm. Output lives outside dist/ because goreleaser's
+// "ensure distribution directory" check runs after before.hooks and
+// refuses a non-empty dist/.
 package main
 
 import (
@@ -24,8 +27,8 @@ func run() error {
 	root := cli.NewRootCmd(nil)
 	root.DisableAutoGenTag = true
 
-	manDir := filepath.Join("dist", "man")
-	compDir := filepath.Join("dist", "completions")
+	manDir := filepath.Join("assets", "man")
+	compDir := filepath.Join("assets", "completions")
 	if err := os.MkdirAll(manDir, 0o755); err != nil {
 		return err
 	}

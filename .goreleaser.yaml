@@ -45,13 +45,13 @@ nfpms:
         dst: /usr/share/doc/dots/README.md
       - src: ./CHANGELOG.md
         dst: /usr/share/doc/dots/CHANGELOG.md
-      - src: ./dist/completions/dots.bash
+      - src: ./assets/completions/dots.bash
         dst: /usr/share/bash-completion/completions/dots
-      - src: ./dist/completions/dots.zsh
+      - src: ./assets/completions/dots.zsh
         dst: /usr/share/zsh/vendor-completions/_dots
-      - src: ./dist/completions/dots.fish
+      - src: ./assets/completions/dots.fish
         dst: /usr/share/fish/vendor_completions.d/dots.fish
-      - src: ./dist/man/*.1
+      - src: ./assets/man/*.1
         dst: /usr/share/man/man1/
         file_info:
           mode: 0644
