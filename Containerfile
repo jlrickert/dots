@@ -57,6 +57,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         git \
         locales \
+        python3 \
         sudo \
         tzdata \
         zsh \
@@ -168,6 +169,10 @@ RUN git config --system --add safe.directory '*' \
     && HOME=/home/tester dots install fixture/platform-aware \
     && HOME=/home/tester dots install fixture/with-overlay \
     && HOME=/home/tester dots install fixture/dir-links \
+    && HOME=/home/tester dots install fixture/hook-sh \
+    && HOME=/home/tester dots install fixture/hook-env-bash \
+    && HOME=/home/tester dots install fixture/hook-env-python3 \
+    && HOME=/home/tester dots install fixture/hook-noshebang \
     && chown -R tester:tester /home/tester
 
 # Verify harness lives outside the user's HOME so it isn't shadowed by any

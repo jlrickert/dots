@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+#
+# hook-sh — proves the installer honors a bare-absolute-path shebang
+# (#!/bin/sh, no env, no args). On Ubuntu /bin/sh is dash, so the hook's
+# marker doubles as a dispatch witness: $BASH_VERSION is unset under
+# dash, so a marker containing "BASH_VERSION=empty" proves dash ran
+# rather than the container's default bash.
+package:
+  name: hook-sh
+  description: Shebang dispatch fixture — #!/bin/sh (dash on Ubuntu)
+  version: 0.1.0
+  tags:
+    - hook
+    - shebang
+hooks:
+  post_install: hooks/post_install.sh

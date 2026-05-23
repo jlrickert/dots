@@ -97,6 +97,14 @@ assert_cmd_stdout_contains "dots list mentions fixture/with-overlay" \
     "fixture/with-overlay" dots list
 assert_cmd_stdout_contains "dots list mentions fixture/dir-links" \
     "fixture/dir-links" dots list
+assert_cmd_stdout_contains "dots list mentions fixture/hook-sh" \
+    "fixture/hook-sh" dots list
+assert_cmd_stdout_contains "dots list mentions fixture/hook-env-bash" \
+    "fixture/hook-env-bash" dots list
+assert_cmd_stdout_contains "dots list mentions fixture/hook-env-python3" \
+    "fixture/hook-env-python3" dots list
+assert_cmd_stdout_contains "dots list mentions fixture/hook-noshebang" \
+    "fixture/hook-noshebang" dots list
 
 # `dots which` takes a destination path and reports the package that placed
 # it. The bashrc landed at ~/.bashrc via shell-basic, so this should resolve.
@@ -121,5 +129,35 @@ assert_cmd_exits_zero "interactive bash auto-loads dots completion" \
 # completion is registered; empty otherwise.
 assert_cmd_stdout_contains "interactive zsh registers dots completion" \
     "dots" zsh -ic "print -l \${(k)_comps[dots]}"
+
+# --- Phase 8: hook shebang dispatch ---
+# Each hook-* fixture's post_install writes a marker whose `INTERPRETER=`
+# tag identifies which binary actually ran. assert_grep uses grep -qF
+# (fixed string), so the tags are literal — not regex.
+#   hook-sh           — #!/bin/sh; Ubuntu's /bin/sh is dash, so the
+#                       script's $BASH_VERSION check writes
+#                       INTERPRETER=dash.
+#   hook-env-bash     — #!/usr/bin/env bash; $BASH_VERSION populated,
+#                       so INTERPRETER=bash.
+#   hook-env-python3  — #!/usr/bin/env python3; marker written by
+#                       Python's stdlib. If dispatch had routed to a
+#                       shell, the shell would have parse-errored on the
+#                       import lines, so a present marker is sufficient
+#                       proof on its own. INTERPRETER=python is belt-and-
+#                       suspenders.
+#   hook-noshebang    — no #! line; resolveInterpreter falls back to
+#                       resolveShell, which uses $SHELL (/bin/bash in
+#                       this image), so INTERPRETER=bash.
+assert_file "${HOME}/markers/hook-sh.marker"
+assert_grep "${HOME}/markers/hook-sh.marker" "INTERPRETER=dash"
+
+assert_file "${HOME}/markers/hook-env-bash.marker"
+assert_grep "${HOME}/markers/hook-env-bash.marker" "INTERPRETER=bash"
+
+assert_file "${HOME}/markers/hook-env-python3.marker"
+assert_grep "${HOME}/markers/hook-env-python3.marker" "INTERPRETER=python"
+
+assert_file "${HOME}/markers/hook-noshebang.marker"
+assert_grep "${HOME}/markers/hook-noshebang.marker" "INTERPRETER=bash"
 
 summary

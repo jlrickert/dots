@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+#
+# hook-noshebang — proves the installer's $SHELL fallback fires when a
+# hook script has no #! line at all. The container sets SHELL=/bin/bash,
+# so a non-empty $BASH_VERSION in the marker proves bash ran via the
+# fallback path (resolveShell), not via shebang dispatch.
+package:
+  name: hook-noshebang
+  description: Shebang dispatch fixture — no shebang, $SHELL fallback
+  version: 0.1.0
+  tags:
+    - hook
+    - shebang
+hooks:
+  post_install: hooks/post_install.sh

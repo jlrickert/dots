@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+#
+# hook-env-python3 — proves the installer dispatches non-shell
+# interpreters via the env-style shebang. The script body is real
+# Python; if dispatch ever routed it to a shell, the shell would
+# parse-error on the import statements, so a successful install plus a
+# marker matching "python=3." is unambiguous evidence python3 ran.
+package:
+  name: hook-env-python3
+  description: Shebang dispatch fixture — #!/usr/bin/env python3
+  version: 0.1.0
+  tags:
+    - hook
+    - shebang
+hooks:
+  post_install: hooks/post_install.py

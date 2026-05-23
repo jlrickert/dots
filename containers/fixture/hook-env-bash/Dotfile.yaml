@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+#
+# hook-env-bash — proves the installer resolves the env-style shebang
+# (#!/usr/bin/env bash, one argument to the interpreter). shell-basic
+# already uses this shebang, but bundled with links and profile.d cascade
+# concerns; a dedicated fixture isolates the dispatch path so a
+# regression surfaces here without ambiguity.
+package:
+  name: hook-env-bash
+  description: Shebang dispatch fixture — #!/usr/bin/env bash
+  version: 0.1.0
+  tags:
+    - hook
+    - shebang
+hooks:
+  post_install: hooks/post_install.sh
