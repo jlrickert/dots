@@ -75,10 +75,10 @@ FROM dots-base AS dots-from-source
 
 COPY --from=builder /out/dots /usr/local/bin/dots
 RUN dots --version \
-    && mkdir -p /usr/share/zsh/vendor-completions \
-    && dots completion bash > /etc/bash_completion.d/dots \
+    && mkdir -p /usr/share/zsh/vendor-completions /usr/share/bash-completion/completions \
+    && dots completion bash > /usr/share/bash-completion/completions/dots \
     && dots completion zsh > /usr/share/zsh/vendor-completions/_dots \
-    && chmod 0644 /etc/bash_completion.d/dots /usr/share/zsh/vendor-completions/_dots
+    && chmod 0644 /usr/share/bash-completion/completions/dots /usr/share/zsh/vendor-completions/_dots
 
 # ---------- Stage: .deb-installed dots ----------
 # Installs the .deb produced by `task package:deb`. The .deb itself drops the

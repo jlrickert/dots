@@ -112,18 +112,24 @@ assert_cmd_stdout_contains "dots which ~/.bashrc resolves to fixture/shell-basic
     "fixture/shell-basic" dots which "${HOME}/.bashrc"
 
 # --- Phase 7: shell completion preload ---
-# The Containerfile drops Cobra-generated completion into the standard
-# system locations. The first three assertions confirm shape; the last
-# spawns an interactive bash (-i) so /etc/bash.bashrc sources the
-# bash-completion engine, which in turn autoloads /etc/bash_completion.d/dots.
-# If any link in that chain breaks (apt package missing, file mode wrong,
-# Ubuntu's bashrc not auto-sourcing completions), `complete -p dots` exits
-# non-zero and this assertion fails loudly.
-assert_file /etc/bash_completion.d/dots
-assert_grep /etc/bash_completion.d/dots "__start_dots"
+# Both image variants land bash completion at the modern Debian path
+# (/usr/share/bash-completion/completions/dots). The source-build stage
+# writes it there explicitly; the deb variant gets it via the nfpm
+# `contents:` block in .goreleaser.yaml.
+#
+# Files at this path are NOT sourced eagerly on shell startup —
+# bash-completion's `_completion_loader` lazy-loads them on the first
+# tab keypress, then returns 124 to signal "retry" to bash's completion
+# engine. That 124 makes `_completion_loader dots && ...` fail even when
+# the file did load, so the runtime check sources the file directly:
+# it proves the file is valid bash AND registers a completion handler
+# for `dots`. The dynamic-loader plumbing is bash-completion's
+# responsibility; we own the file, not the loader.
+assert_file /usr/share/bash-completion/completions/dots
+assert_grep /usr/share/bash-completion/completions/dots "__start_dots"
 assert_file /usr/share/zsh/vendor-completions/_dots
-assert_cmd_exits_zero "interactive bash auto-loads dots completion" \
-    bash -ic "complete -p dots >/dev/null"
+assert_cmd_exits_zero "bash sources dots completion and registers handler" \
+    bash -ic ". /usr/share/bash-completion/completions/dots && complete -p dots >/dev/null"
 # Symmetric zsh check: prove /etc/zsh/zshrc runs compinit and that _dots is
 # discoverable on $fpath. `${(k)_comps[dots]}` prints "dots" when the
 # completion is registered; empty otherwise.
