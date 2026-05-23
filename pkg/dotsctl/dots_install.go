@@ -266,8 +266,9 @@ func (d *Dots) packageDir(tap, pkg string) string {
 func (d *Dots) hookRunner() *dots.HookRunner {
 	streams := d.Runtime.Stream()
 	return &dots.HookRunner{
-		Stdout: streams.Out,
-		Stderr: streams.Err,
+		Runtime: d.Runtime,
+		Stdout:  streams.Out,
+		Stderr:  streams.Err,
 	}
 }
 

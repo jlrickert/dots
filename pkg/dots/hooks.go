@@ -1,6 +1,7 @@
 package dots
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -9,10 +10,15 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/jlrickert/cli-toolkit/toolkit"
 )
 
 // HookRunner executes lifecycle hook scripts from package manifests.
 type HookRunner struct {
+	// Runtime is the I/O seam used to read script shebangs. When nil, hook
+	// dispatch still works but bypasses the test runtime's jailed FS.
+	Runtime *toolkit.Runtime
 	// Stdout and Stderr receive hook output.
 	Stdout io.Writer
 	Stderr io.Writer
@@ -31,7 +37,7 @@ func (h *HookRunner) RunHook(ctx context.Context, hookValue, pkgDir string) erro
 	// Check if it's a file path by joining with pkgDir and stat-ing.
 	absPath := filepath.Join(pkgDir, filepath.FromSlash(strings.TrimSpace(hookValue)))
 	if info, err := os.Stat(absPath); err == nil && !info.IsDir() {
-		shell, args := resolveShell(absPath)
+		shell, args := h.resolveInterpreter(absPath)
 		cmd := exec.CommandContext(ctx, shell, append(args, absPath)...)
 		cmd.Dir = pkgDir
 		cmd.Stdout = h.Stdout
@@ -61,6 +67,47 @@ func (h *HookRunner) RunHook(ctx context.Context, hookValue, pkgDir string) erro
 		return fmt.Errorf("hook command failed: %w", err)
 	}
 	return nil
+}
+
+// resolveInterpreter picks the program to run a hook script with. On Unix it
+// honors the script's `#!` line so a hook tagged `#!/usr/bin/env bash` runs
+// under bash regardless of the user's $SHELL. The kernel's execve shebang
+// path is skipped because the script is being passed as an argument rather
+// than exec'd directly, so we reproduce that lookup here. Any failure to
+// read or parse the shebang falls back to resolveShell, which preserves the
+// previous $SHELL-driven behavior. On Windows shebangs are ignored entirely
+// — extension-based dispatch in resolveShell takes precedence.
+func (h *HookRunner) resolveInterpreter(scriptPath string) (string, []string) {
+	if runtime.GOOS == "windows" {
+		return resolveShell(scriptPath)
+	}
+	data, err := h.readScript(scriptPath)
+	if err != nil {
+		return resolveShell(scriptPath)
+	}
+	if i := bytes.IndexByte(data, '\n'); i >= 0 {
+		data = data[:i]
+	}
+	line := strings.TrimRight(string(data), "\r")
+	if !strings.HasPrefix(line, "#!") {
+		return resolveShell(scriptPath)
+	}
+	fields := strings.Fields(strings.TrimPrefix(line, "#!"))
+	if len(fields) == 0 {
+		return resolveShell(scriptPath)
+	}
+	return fields[0], fields[1:]
+}
+
+// readScript reads scriptPath through the toolkit Runtime so the test
+// runtime's jailed FS sees the access. When no Runtime is wired the read
+// falls back to the host FS — the same posture HookRunner already has for
+// os.Stat and exec.
+func (h *HookRunner) readScript(scriptPath string) ([]byte, error) {
+	if h != nil && h.Runtime != nil {
+		return h.Runtime.ReadFile(scriptPath)
+	}
+	return os.ReadFile(scriptPath)
 }
 
 // resolveShell determines the shell and arguments to use for a hook script.
