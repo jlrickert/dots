@@ -326,4 +326,4 @@ For the full configuration reference, see [config.yaml Reference](docs/config-ya
 | [Work Mode](docs/work-mode.md)                 | Development workflow with local checkouts           |
 | [Bootstrapping](docs/bootstrapping.md)         | Self-bootstrapping and machine recovery             |
 
-For the design specification, see [dots-design.md](dots-design.md).
+The docs above are the source of truth for dots behavior; [dots-design.md](dots-design.md) is the original design record. Contributor docs (architecture, testing, errors, schemas) live in [docs/development/](docs/development/); agent guidance is in [AGENTS.md](AGENTS.md).
