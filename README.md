@@ -126,9 +126,14 @@ This creates a default config at `~/.config/dots/config.yaml` (Unix) or `%APPDAT
 | Diff                               | Done    | Checksum comparison for copy-strategy files                                                                                                              |
 | Which                              | Done    | Identify which package owns a file                                                                                                                       |
 | **Profiles**                       |         |                                                                                                                                                          |
-| Full CRUD + apply / switch         | Done    | create, delete, list, show, add, remove, apply, switch                                                                                                   |
+| Full CRUD + apply                  | Done    | create, delete, list, show, add, remove, apply                                                                                                           |
+| Reconciling `profile apply`        | Partial | `apply` only installs today; no uninstall of extra packages or `--dry-run`. `switch` still exists and should be removed. See [Profiles](docs/profiles.md) |
+| Inheritance (`extends`)            | Partial | Single-parent chain resolution with dedup. Multiple parents not yet supported. See [Profiles](docs/profiles.md#inheritance-with-extends)                 |
+| Profile `exclude`                  | Planned | Field, `exclude`/`unexclude`, `extend`/`unextend`, and `create --extends` not implemented                                                                |
+| Active profile in lockfile only    | Partial | `status` still reads `core.active_profile` from config first; config field should be dropped                                                             |
+| Always-installed packages          | Planned | `core.always_installed` in config; included in every profile apply, overrides `exclude`. See [Profiles](docs/profiles.md#always-installed-packages)      |
+| `dots init --apply`                | Planned | Apply a profile as part of bootstrap. See [Bootstrapping](docs/bootstrapping.md#one-command-bootstrap)                                                   |
 | Export / Import                    | Done    | YAML-based profile sharing                                                                                                                               |
-| Inheritance (`extends`)            | Done    | Chain resolution with dedup                                                                                                                              |
 | **Work Mode**                      |         |                                                                                                                                                          |
 | On / Off / Status / Rebuild        | Done    | Automatic re-linking on toggle                                                                                                                           |
 | **Sync**                           |         |                                                                                                                                                          |
@@ -206,11 +211,11 @@ Profiles are named lists of packages that can be applied together:
 ```bash
 dots profile create work
 dots profile add work personal/zsh personal/nvim personal/git
-dots profile apply work
-dots profile switch personal   # switch to a different profile
+dots profile apply work        # install work's packages, remove everything else
+dots profile apply personal    # change to a different profile
 ```
 
-Profiles support inheritance via `extends` and can be exported/imported:
+Profiles can extend one or more other profiles, exclude inherited packages, and be exported/imported:
 
 ```bash
 dots profile export work > work-profile.yaml

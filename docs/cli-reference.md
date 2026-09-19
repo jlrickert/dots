@@ -24,6 +24,7 @@ Initialize the dots environment. Creates a default config file if one doesn't ex
 dots init
 dots init --from git@github.com:you/dotfiles.git --path dots
 dots init --from git@github.com:you/dot-personal.git --name private --path dots-config
+dots init --from git@github.com:you/dotfiles.git --path dots --apply work
 ```
 
 | Flag     | Description                                                                                                                                                                               |
@@ -31,8 +32,11 @@ dots init --from git@github.com:you/dot-personal.git --name private --path dots-
 | `--from` | Git URL to clone as initial tap                                                                                                                                                           |
 | `--path` | Package path within the tap to install                                                                                                                                                    |
 | `--name` | Tap name for the `--from` clone (default: `default`). Set this to match the tap name declared in the bootstrap package's `config.yaml` so the on-disk tap and the installed config agree. |
+| `--apply` | Profile to apply after initialization, with the same behavior as [`dots profile apply`](#dots-profile-apply).                                                                             |
 
 When `--from` is specified, dots clones the repo as a tap and installs the package at `--path` from it.
+
+When `--apply` is specified, dots applies the named profile after everything else, so profiles installed by the bootstrap package are available. If the profile is missing, the command fails after the bootstrap has already completed. Config is reloaded after the bootstrap install, so `core.always_installed` from the bootstrap package's config applies. List the bootstrap package there, or `apply` uninstalls it. See [Bootstrapping](bootstrapping.md#one-command-bootstrap).
 
 If the bootstrap package (the one at `--path`) ships a `config.yaml` that declares the same repo as a named tap (e.g. `taps.private.url` matching `--from`), pass `--name private` so dots registers the clone under `private` rather than the generic `default`. Otherwise dots ends up with two taps — `default` and `private` — pointing at the same URL.
 
@@ -243,7 +247,12 @@ Create a new empty profile.
 
 ```bash
 dots profile create work
+dots profile create work --extends base --extends dev
 ```
+
+| Flag        | Description                                    |
+| ----------- | ---------------------------------------------- |
+| `--extends` | Parent profile to inherit from. Repeatable.    |
 
 ### `dots profile delete`
 
@@ -263,7 +272,7 @@ dots profile list
 
 ### `dots profile show`
 
-Show profile details (name, extends, packages).
+Show profile details: name, `extends` parents, `exclude` list, and the resolved package list with the source of each package. Flags excludes that match no inherited package.
 
 ```bash
 dots profile show work
@@ -285,21 +294,50 @@ Remove a package from a profile.
 dots profile remove work personal/git
 ```
 
+### `dots profile extend`
+
+Add parent profiles to a profile's `extends` list.
+
+```bash
+dots profile extend work base dev
+```
+
+### `dots profile unextend`
+
+Remove parent profiles from a profile's `extends` list.
+
+```bash
+dots profile unextend work dev
+```
+
+### `dots profile exclude`
+
+Exclude inherited packages from a profile. Excludes only affect packages inherited through `extends`; the profile's own packages are always installed. See [Excluding Inherited Packages](profiles.md#excluding-inherited-packages).
+
+```bash
+dots profile exclude work personal/tmux
+```
+
+### `dots profile unexclude`
+
+Remove packages from a profile's `exclude` list.
+
+```bash
+dots profile unexclude work personal/tmux
+```
+
 ### `dots profile apply`
 
-Install all packages in a profile.
+Make the installed packages match a profile exactly: uninstall every installed package not in the profile's resolved list plus `core.always_installed` (including packages installed by hand), install the missing ones, and record the profile as active in the lockfile. This is also how you change profiles.
 
 ```bash
 dots profile apply work
+dots profile apply personal --dry-run
 ```
 
-### `dots profile switch`
-
-Switch to a different profile (sets it as active).
-
-```bash
-dots profile switch personal
-```
+| Flag        | Description                                                        |
+| ----------- | ------------------------------------------------------------------ |
+| `--dry-run` | Print the packages that would be removed and installed, then exit. |
 
 ### `dots profile export`
 

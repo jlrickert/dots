@@ -12,12 +12,24 @@
       "description": "Profile name (matches the file basename)"
     },
     "extends": {
-      "type": "string",
-      "description": "Parent profile name. The parent's packages are merged before this profile's packages, deduped."
+      "description": "Parent profile name, or a list of parent profile names. Parents are resolved in order and their packages merged (deduped) before this profile's exclude and packages are applied.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      ]
     },
     "packages": {
       "type": "array",
-      "description": "Package references (tap/package) to install when this profile is applied",
+      "description": "Package references (tap/package) to install when this profile is applied. Always installed, even if also listed in exclude.",
+      "items": { "type": "string" }
+    },
+    "exclude": {
+      "type": "array",
+      "description": "Package references (tap/package) to drop from the packages inherited through extends. Does not affect this profile's own packages.",
       "items": { "type": "string" }
     }
   }

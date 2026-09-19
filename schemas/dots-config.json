@@ -79,9 +79,11 @@
       "description": "Core behavior settings",
       "additionalProperties": false,
       "properties": {
-        "active_profile": {
-          "type": "string",
-          "description": "Currently active profile name"
+        "always_installed": {
+          "type": "array",
+          "description": "Packages (tap/package) included in every applied profile. They override profile excludes and are never uninstalled by profile apply. Platform overrides append to the base list.",
+          "items": { "type": "string" },
+          "uniqueItems": true
         },
         "conflict_strategy": {
           "type": "string",
