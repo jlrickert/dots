@@ -127,11 +127,11 @@ This creates a default config at `~/.config/dots/config.yaml` (Unix) or `%APPDAT
 | Which                              | Done    | Identify which package owns a file                                                                                                                       |
 | **Profiles**                       |         |                                                                                                                                                          |
 | Full CRUD + apply                  | Done    | create, delete, list, show, add, remove, apply                                                                                                           |
-| Reconciling `profile apply`        | Partial | `apply` only installs today; no uninstall of extra packages or `--dry-run`. `switch` still exists and should be removed. See [Profiles](docs/profiles.md) |
-| Inheritance (`extends`)            | Partial | Single-parent chain resolution with dedup. Multiple parents not yet supported. See [Profiles](docs/profiles.md#inheritance-with-extends)                 |
-| Profile `exclude`                  | Planned | Field, `exclude`/`unexclude`, `extend`/`unextend`, and `create --extends` not implemented                                                                |
-| Active profile in lockfile only    | Partial | `status` still reads `core.active_profile` from config first; config field should be dropped                                                             |
-| Always-installed packages          | Planned | `core.always_installed` in config; included in every profile apply, overrides `exclude`. See [Profiles](docs/profiles.md#always-installed-packages)      |
+| Reconciling `profile apply`        | Done    | Removes packages not in the profile, installs missing ones, `--dry-run`. Replaces `profile switch`                                                       |
+| Inheritance (`extends`)            | Done    | Multiple parents, first-occurrence dedup, cycle detection                                                                                                |
+| Profile `exclude`                  | Partial | Field is resolved. `exclude`/`unexclude`, `extend`/`unextend`, `create --extends`, and resolved `show` not implemented yet                               |
+| Active profile in lockfile only    | Done    | `state.active_profile` in the lockfile; `core.active_profile` is no longer read                                                                          |
+| Always-installed packages          | Done    | `core.always_installed` in config; included in every profile apply, overrides `exclude`. See [Profiles](docs/profiles.md#always-installed-packages)      |
 | `dots init --apply`                | Planned | Apply a profile as part of bootstrap. See [Bootstrapping](docs/bootstrapping.md#one-command-bootstrap)                                                   |
 | Export / Import                    | Done    | YAML-based profile sharing                                                                                                                               |
 | **Work Mode**                      |         |                                                                                                                                                          |

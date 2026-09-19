@@ -23,8 +23,9 @@ core:
 func TestParseConfig_Full(t *testing.T) {
 	data := []byte(`
 core:
-  active_profile: work
+  active_profile: work # legacy key; ignored now that the lockfile tracks it
   conflict_strategy: overlay
+  always_installed: [personal/dots]
   backup: false
   link_strategy: copy
 
@@ -56,7 +57,7 @@ platform:
 `)
 	cfg, err := dots.ParseConfig(data)
 	require.NoError(t, err)
-	require.Equal(t, "work", cfg.Core.ActiveProfile)
+	require.Equal(t, []string{"personal/dots"}, cfg.Core.AlwaysInstalled)
 	require.Equal(t, "overlay", cfg.Core.ConflictStrategy)
 	require.NotNil(t, cfg.Core.Backup)
 	require.False(t, *cfg.Core.Backup)
@@ -79,10 +80,10 @@ func TestParseConfig_Invalid(t *testing.T) {
 
 func TestMergeConfig(t *testing.T) {
 	base := dots.DefaultConfig()
-	base.Core.ActiveProfile = "personal"
+	base.Core.AlwaysInstalled = []string{"personal/dots"}
 
 	override := &dots.Config{
-		Core: dots.CoreConfig{ActiveProfile: "work"},
+		Core: dots.CoreConfig{AlwaysInstalled: []string{"personal/zsh", "personal/dots"}},
 		Taps: map[string]dots.TapConfig{
 			"work": {URL: "git@github.com:corp/dotfiles.git"},
 		},
@@ -90,7 +91,7 @@ func TestMergeConfig(t *testing.T) {
 	}
 
 	result := dots.MergeConfig(&base, override)
-	require.Equal(t, "work", result.Core.ActiveProfile)
+	require.Equal(t, []string{"personal/dots", "personal/zsh"}, result.Core.AlwaysInstalled)
 	require.Equal(t, dots.LinkCopy, result.Core.LinkStrategy) // from base default
 	require.Equal(t, "main", result.Git.DefaultBranch)        // from base default
 	require.Equal(t, "git@github.com:corp/dotfiles.git", result.Taps["work"].URL)
@@ -118,4 +119,22 @@ func TestConfig_ResolveCorePlatform(t *testing.T) {
 		core := cfg.ResolveCorePlatform(dots.Platform{OS: "darwin", Arch: "arm64"})
 		require.Equal(t, dots.LinkHardlink, core.LinkStrategy)
 	})
+}
+
+func TestConfig_ResolveCorePlatform_AlwaysInstalledConcatenates(t *testing.T) {
+	cfg := dots.DefaultConfig()
+	cfg.Core.AlwaysInstalled = []string{"personal/dots"}
+	cfg.Platform = map[string]dots.CoreConfig{
+		"darwin":       {AlwaysInstalled: []string{"personal/brew", "personal/dots"}},
+		"darwin-arm64": {AlwaysInstalled: []string{"personal/rosetta"}},
+	}
+
+	core := cfg.ResolveCorePlatform(dots.Platform{OS: "darwin", Arch: "arm64"})
+	require.Equal(t, []string{"personal/dots", "personal/brew", "personal/rosetta"}, core.AlwaysInstalled)
+
+	core = cfg.ResolveCorePlatform(dots.Platform{OS: "linux", Arch: "amd64"})
+	require.Equal(t, []string{"personal/dots"}, core.AlwaysInstalled)
+
+	// Resolving must not mutate the base list.
+	require.Equal(t, []string{"personal/dots"}, cfg.Core.AlwaysInstalled)
 }

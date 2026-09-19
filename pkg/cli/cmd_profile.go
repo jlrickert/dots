@@ -3,6 +3,9 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
+
+	"github.com/jlrickert/dots/pkg/dotsctl"
 
 	"github.com/spf13/cobra"
 )
@@ -21,7 +24,6 @@ func newProfileCmd(deps *Deps) *cobra.Command {
 		newProfileAddCmd(deps),
 		newProfileRemoveCmd(deps),
 		newProfileApplyCmd(deps),
-		newProfileSwitchCmd(deps),
 		newProfileExportCmd(deps),
 		newProfileImportCmd(deps),
 	)
@@ -108,8 +110,11 @@ func newProfileShowCmd(deps *Deps) *cobra.Command {
 			}
 			out := cmd.OutOrStdout()
 			fmt.Fprintf(out, "Name:     %s\n", profile.Name)
-			if profile.Extends != "" {
-				fmt.Fprintf(out, "Extends:  %s\n", profile.Extends)
+			if len(profile.Extends) > 0 {
+				fmt.Fprintf(out, "Extends:  %s\n", strings.Join(profile.Extends, ", "))
+			}
+			if len(profile.Exclude) > 0 {
+				fmt.Fprintf(out, "Exclude:  %s\n", strings.Join(profile.Exclude, ", "))
 			}
 			fmt.Fprintln(out, "Packages:")
 			for _, pkg := range profile.Packages {
@@ -175,43 +180,47 @@ func newProfileRemoveCmd(deps *Deps) *cobra.Command {
 }
 
 func newProfileApplyCmd(deps *Deps) *cobra.Command {
+	var dryRun bool
 	cmd := &cobra.Command{
 		Use:   "apply <name>",
-		Short: "Install all packages in a profile",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			d, err := newDotsService(deps)
-			if err != nil {
-				return err
-			}
-			if err := d.ProfileApply(cmd.Context(), args[0]); err != nil {
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Applied profile %s\n", args[0])
-			return nil
-		},
-	}
-	cmd.ValidArgsFunction = completeProfileNames(deps)
-	return cmd
-}
+		Short: "Make installed packages match a profile",
+		Long: `Make installed packages match a profile exactly.
 
-func newProfileSwitchCmd(deps *Deps) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "switch <name>",
-		Short: "Switch to a different profile",
-		Args:  cobra.ExactArgs(1),
+Uninstalls every installed package that is not in the profile's resolved list
+(plus core.always_installed), including packages installed by hand, installs
+the missing ones, and records the profile as active.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			d, err := newDotsService(deps)
 			if err != nil {
 				return err
 			}
-			if err := d.ProfileSwitch(cmd.Context(), args[0]); err != nil {
+			result, err := d.ProfileApply(cmd.Context(), dotsctl.ProfileApplyOptions{
+				Name:   args[0],
+				DryRun: dryRun,
+			})
+			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Switched to profile %s\n", args[0])
+
+			out := cmd.OutOrStdout()
+			if result.DryRun {
+				fmt.Fprintln(out, "Dry run — no changes made:")
+			}
+			for _, ref := range result.Remove {
+				fmt.Fprintf(out, "  remove  %s\n", ref)
+			}
+			for _, ref := range result.Install {
+				fmt.Fprintf(out, "  install %s\n", ref)
+			}
+			if !result.DryRun {
+				fmt.Fprintf(out, "Applied profile %s (%d removed, %d installed, %d unchanged)\n",
+					result.Profile, len(result.Remove), len(result.Install), len(result.Keep))
+			}
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would be removed and installed without changing anything")
 	cmd.ValidArgsFunction = completeProfileNames(deps)
 	return cmd
 }

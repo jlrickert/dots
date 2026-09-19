@@ -30,10 +30,13 @@ type Config struct {
 
 // CoreConfig holds top-level behavior settings.
 type CoreConfig struct {
-	ActiveProfile    string       `yaml:"active_profile,omitempty"`
 	ConflictStrategy string       `yaml:"conflict_strategy,omitempty"`
 	Backup           *bool        `yaml:"backup,omitempty"`
 	LinkStrategy     LinkStrategy `yaml:"link_strategy,omitempty"`
+	// AlwaysInstalled lists packages (tap/package) included in every applied
+	// profile. They override profile excludes. Platform overrides append to
+	// the base list rather than replacing it.
+	AlwaysInstalled []string `yaml:"always_installed,omitempty"`
 }
 
 // GitConfig holds git-related settings.
@@ -92,9 +95,6 @@ func LoadConfigFile(path string) (*Config, error) {
 func MergeConfig(base, override *Config) *Config {
 	result := *base
 
-	if override.Core.ActiveProfile != "" {
-		result.Core.ActiveProfile = override.Core.ActiveProfile
-	}
 	if override.Core.ConflictStrategy != "" {
 		result.Core.ConflictStrategy = override.Core.ConflictStrategy
 	}
@@ -104,6 +104,7 @@ func MergeConfig(base, override *Config) *Config {
 	if override.Core.LinkStrategy != "" {
 		result.Core.LinkStrategy = override.Core.LinkStrategy
 	}
+	result.Core.AlwaysInstalled = appendUnique(result.Core.AlwaysInstalled, override.Core.AlwaysInstalled...)
 	if override.Git.DefaultBranch != "" {
 		result.Git.DefaultBranch = override.Git.DefaultBranch
 	}
@@ -162,6 +163,7 @@ func (c *Config) ResolveCorePlatform(p Platform) CoreConfig {
 		if osOverride.Backup != nil {
 			core.Backup = osOverride.Backup
 		}
+		core.AlwaysInstalled = appendUnique(core.AlwaysInstalled, osOverride.AlwaysInstalled...)
 	}
 
 	if archOverride, ok := c.Platform[p.String()]; ok {
@@ -174,7 +176,29 @@ func (c *Config) ResolveCorePlatform(p Platform) CoreConfig {
 		if archOverride.Backup != nil {
 			core.Backup = archOverride.Backup
 		}
+		core.AlwaysInstalled = appendUnique(core.AlwaysInstalled, archOverride.AlwaysInstalled...)
 	}
 
 	return core
+}
+
+// appendUnique returns a new slice holding base followed by each item of
+// extra not already present, preserving first-occurrence order. It never
+// aliases base, so callers can safely append to the result.
+func appendUnique(base []string, extra ...string) []string {
+	if len(base) == 0 && len(extra) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(base)+len(extra))
+	seen := make(map[string]struct{}, len(base)+len(extra))
+	for _, list := range [][]string{base, extra} {
+		for _, s := range list {
+			if _, ok := seen[s]; ok {
+				continue
+			}
+			seen[s] = struct{}{}
+			out = append(out, s)
+		}
+	}
+	return out
 }
