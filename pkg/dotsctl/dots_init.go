@@ -18,6 +18,9 @@ type InitOptions struct {
 	// Set this to match the tap name declared in the bootstrap package's config
 	// so the on-disk tap and the installed config.yaml agree.
 	Name string
+	// Apply is an optional profile to apply once initialization (including
+	// any bootstrap install) has finished.
+	Apply string
 }
 
 // defaultTapName is the tap name used when --name is not supplied.
@@ -26,7 +29,8 @@ const defaultTapName = "default"
 // Init initializes the dots environment: creates config and state directories,
 // writes a default config, and optionally registers an initial tap.
 // When --from and --path are provided, it clones the tap, finds the dots
-// package at the given path, and installs it (self-bootstrapping).
+// package at the given path, and installs it (self-bootstrapping). When
+// Apply is set, the named profile is applied last.
 func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 	// Create directories.
 	configDir := d.PathService.ConfigDir()
@@ -96,6 +100,15 @@ func (d *Dots) Init(ctx context.Context, opts InitOptions) error {
 			if err != nil {
 				return fmt.Errorf("install bootstrap package: %w", err)
 			}
+		}
+	}
+
+	if opts.Apply != "" {
+		// The bootstrap package may have just linked a new config.yaml
+		// (with core.always_installed), so drop any cached copy.
+		d.ConfigService.InvalidateCache()
+		if _, err := d.ProfileApply(ctx, ProfileApplyOptions{Name: opts.Apply}); err != nil {
+			return fmt.Errorf("apply profile %s (init completed): %w", opts.Apply, err)
 		}
 	}
 

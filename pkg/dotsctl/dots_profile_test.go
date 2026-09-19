@@ -242,3 +242,58 @@ func TestStatus_ActiveProfileFromLockfile(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "p", status.Profile)
 }
+
+// --- Init --apply ---
+
+// seedBootstrapPackage creates a "dots" package in tap whose only link is the
+// given config.yaml, mirroring the docs' dots package pattern.
+func seedBootstrapPackage(t *testing.T, d *dotsctl.Dots, repo *dots.MemoryRepo, tap, config string) {
+	t.Helper()
+	pkgDir := filepath.Join(d.PathService.TapsDir(), tap, "dots")
+	require.NoError(t, os.MkdirAll(pkgDir, 0o755))
+	manifest := []byte("package:\n  name: dots\nlinks:\n  config.yaml: \"@config/dots/config.yaml\"\n")
+	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "Dotfile.yaml"), manifest, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(pkgDir, "config.yaml"), []byte(config), 0o644))
+	require.NoError(t, repo.AddTap(context.Background(), dots.TapInfo{Name: tap, URL: "test"}))
+	require.NoError(t, repo.AddPackage(tap, dots.PackageInfo{Tap: tap, Name: "dots", Dir: "dots"}, manifest))
+}
+
+func TestInit_ApplyKeepsBootstrapPackage(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+	seedBootstrapPackage(t, d, repo, "personal", "core:\n  always_installed: [personal/dots]\n")
+	seedPackage(t, d, repo, "personal", "zsh")
+	// work never mentions personal/dots; always_installed from the
+	// bootstrapped config must keep it.
+	writeProfile(t, d, "name: work\npackages: [personal/zsh]\n")
+
+	err := d.Init(ctx, dotsctl.InitOptions{
+		From:  "git@github.com:me/dotfiles.git",
+		Name:  "personal",
+		Path:  "dots",
+		Apply: "work",
+	})
+	require.NoError(t, err)
+
+	require.ElementsMatch(t, []string{"personal/dots", "personal/zsh"}, installedRefs(t, repo))
+	lf, err := repo.ReadLockfile(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "work", lf.State.ActiveProfile)
+}
+
+func TestInit_ApplyMissingProfileAfterBootstrap(t *testing.T) {
+	d, repo := newTestDots(t)
+	ctx := context.Background()
+	seedBootstrapPackage(t, d, repo, "personal", "core: {}\n")
+
+	err := d.Init(ctx, dotsctl.InitOptions{
+		From:  "git@github.com:me/dotfiles.git",
+		Name:  "personal",
+		Path:  "dots",
+		Apply: "nope",
+	})
+	require.ErrorIs(t, err, dots.ErrNotExist)
+	require.Contains(t, err.Error(), "init completed")
+	// The bootstrap install still happened.
+	require.Equal(t, []string{"personal/dots"}, installedRefs(t, repo))
+}

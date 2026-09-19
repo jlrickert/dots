@@ -111,7 +111,7 @@ This creates a default config at `~/.config/dots/config.yaml` (Unix) or `%APPDAT
 | Feature                            | Status  | Notes                                                                                                                                                    |
 | ---------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Core Operations**                |         |                                                                                                                                                          |
-| Init (`--from`, `--path`)          | Done    | Self-bootstrapping from existing repo                                                                                                                    |
+| Init (`--from`, `--path`, `--apply`) | Done    | Self-bootstrapping from existing repo, then optional profile apply                                                                                       |
 | Install                            | Done    | Manifest parsing, platform cascade, hooks, lockfile, `--dry-run`, `--strategy`                                                                           |
 | Remove                             | Done    | Lockfile lookup, link removal, backup restore, hooks                                                                                                     |
 | Upgrade (`--all`)                  | Done    | Tap update + reinstall                                                                                                                                   |
@@ -132,7 +132,7 @@ This creates a default config at `~/.config/dots/config.yaml` (Unix) or `%APPDAT
 | Profile `exclude`                  | Partial | Field is resolved. `exclude`/`unexclude`, `extend`/`unextend`, `create --extends`, and resolved `show` not implemented yet                               |
 | Active profile in lockfile only    | Done    | `state.active_profile` in the lockfile; `core.active_profile` is no longer read                                                                          |
 | Always-installed packages          | Done    | `core.always_installed` in config; included in every profile apply, overrides `exclude`. See [Profiles](docs/profiles.md#always-installed-packages)      |
-| `dots init --apply`                | Planned | Apply a profile as part of bootstrap. See [Bootstrapping](docs/bootstrapping.md#one-command-bootstrap)                                                   |
+| `dots init --apply`                | Done    | Applies a profile after bootstrap; config is reloaded first so `always_installed` from the bootstrap package applies                                     |
 | Export / Import                    | Done    | YAML-based profile sharing                                                                                                                               |
 | **Work Mode**                      |         |                                                                                                                                                          |
 | On / Off / Status / Rebuild        | Done    | Automatic re-linking on toggle                                                                                                                           |
