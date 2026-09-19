@@ -297,3 +297,97 @@ func TestInit_ApplyMissingProfileAfterBootstrap(t *testing.T) {
 	// The bootstrap install still happened.
 	require.Equal(t, []string{"personal/dots"}, installedRefs(t, repo))
 }
+
+// --- Editing ---
+
+func TestProfileCreate_WithExtends(t *testing.T) {
+	d, _ := newTestDots(t)
+	ctx := context.Background()
+	writeProfile(t, d, "name: base\npackages: [t/a]\n")
+	writeProfile(t, d, "name: dev\npackages: [t/b]\n")
+
+	require.NoError(t, d.ProfileCreate(ctx, dotsctl.ProfileCreateOptions{Name: "work", Extends: []string{"base", "dev", "base"}}))
+
+	show, err := d.ProfileShow(ctx, "work")
+	require.NoError(t, err)
+	require.Equal(t, dots.StringList{"base", "dev"}, show.Profile.Extends)
+	require.Equal(t, []string{"t/a", "t/b"}, refs(show.Resolved))
+}
+
+func TestProfileCreate_MissingParent(t *testing.T) {
+	d, _ := newTestDots(t)
+	ctx := context.Background()
+
+	err := d.ProfileCreate(ctx, dotsctl.ProfileCreateOptions{Name: "work", Extends: []string{"nope"}})
+	require.ErrorIs(t, err, dots.ErrNotExist)
+
+	_, err = d.ProfileShow(ctx, "work")
+	require.ErrorIs(t, err, dots.ErrNotExist, "a rejected create must not leave a file behind")
+}
+
+func TestProfileExtend_RejectsCycle(t *testing.T) {
+	d, _ := newTestDots(t)
+	ctx := context.Background()
+	writeProfile(t, d, "name: base\n")
+	writeProfile(t, d, "name: work\nextends: base\n")
+
+	err := d.ProfileExtend(ctx, "base", []string{"work"})
+	var cycle *dots.ProfileCycleError
+	require.ErrorAs(t, err, &cycle)
+	require.Equal(t, []string{"base", "work", "base"}, cycle.Chain)
+
+	show, err := d.ProfileShow(ctx, "base")
+	require.NoError(t, err)
+	require.Empty(t, show.Profile.Extends, "a rejected extend must not be saved")
+}
+
+func TestProfileExtendUnextend(t *testing.T) {
+	d, _ := newTestDots(t)
+	ctx := context.Background()
+	writeProfile(t, d, "name: base\n")
+	writeProfile(t, d, "name: dev\n")
+	writeProfile(t, d, "name: work\n")
+
+	require.NoError(t, d.ProfileExtend(ctx, "work", []string{"base", "dev", "base"}))
+	show, err := d.ProfileShow(ctx, "work")
+	require.NoError(t, err)
+	require.Equal(t, dots.StringList{"base", "dev"}, show.Profile.Extends)
+
+	require.NoError(t, d.ProfileUnextend(ctx, "work", []string{"base"}))
+	show, err = d.ProfileShow(ctx, "work")
+	require.NoError(t, err)
+	require.Equal(t, dots.StringList{"dev"}, show.Profile.Extends)
+}
+
+func TestProfileExcludeUnexclude(t *testing.T) {
+	d, _ := newTestDots(t)
+	ctx := context.Background()
+	writeProfile(t, d, "name: base\npackages: [t/a, t/b]\n")
+	writeProfile(t, d, "name: work\nextends: base\n")
+
+	require.NoError(t, d.ProfileExclude(ctx, "work", []string{"t/a", "t/zzz"}))
+	show, err := d.ProfileShow(ctx, "work")
+	require.NoError(t, err)
+	require.Equal(t, []string{"t/a", "t/zzz"}, show.Profile.Exclude)
+	require.Equal(t, []string{"t/b"}, refs(show.Resolved))
+	require.Equal(t, []string{"t/zzz"}, show.UnmatchedExcludes)
+
+	require.NoError(t, d.ProfileUnexclude(ctx, "work", []string{"t/a", "t/zzz"}))
+	show, err = d.ProfileShow(ctx, "work")
+	require.NoError(t, err)
+	require.Empty(t, show.Profile.Exclude)
+	require.Equal(t, []string{"t/a", "t/b"}, refs(show.Resolved))
+}
+
+func TestProfileShow_IncludesAlwaysInstalled(t *testing.T) {
+	d, _ := newTestDots(t)
+	writeConfig(t, d, "core:\n  always_installed: [personal/dots]\n")
+	writeProfile(t, d, "name: work\npackages: [personal/zsh]\n")
+
+	show, err := d.ProfileShow(context.Background(), "work")
+	require.NoError(t, err)
+	require.Equal(t, []dotsctl.ResolvedPackage{
+		{Ref: "personal/dots", Source: dotsctl.AlwaysInstalledSource},
+		{Ref: "personal/zsh", Source: "work"},
+	}, show.Resolved)
+}

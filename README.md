@@ -126,10 +126,10 @@ This creates a default config at `~/.config/dots/config.yaml` (Unix) or `%APPDAT
 | Diff                               | Done    | Checksum comparison for copy-strategy files                                                                                                              |
 | Which                              | Done    | Identify which package owns a file                                                                                                                       |
 | **Profiles**                       |         |                                                                                                                                                          |
-| Full CRUD + apply                  | Done    | create, delete, list, show, add, remove, apply                                                                                                           |
+| Full CRUD + apply                  | Done    | create (`--extends`), delete, list, show (resolved, with sources), add, remove, extend, unextend, exclude, unexclude, apply                              |
 | Reconciling `profile apply`        | Done    | Removes packages not in the profile, installs missing ones, `--dry-run`. Replaces `profile switch`                                                       |
 | Inheritance (`extends`)            | Done    | Multiple parents, first-occurrence dedup, cycle detection                                                                                                |
-| Profile `exclude`                  | Partial | Field is resolved. `exclude`/`unexclude`, `extend`/`unextend`, `create --extends`, and resolved `show` not implemented yet                               |
+| Profile `exclude`                  | Done    | Drops inherited packages; `exclude`/`unexclude` commands; `show` flags unmatched excludes                                                                |
 | Active profile in lockfile only    | Done    | `state.active_profile` in the lockfile; `core.active_profile` is no longer read                                                                          |
 | Always-installed packages          | Done    | `core.always_installed` in config; included in every profile apply, overrides `exclude`. See [Profiles](docs/profiles.md#always-installed-packages)      |
 | `dots init --apply`                | Done    | Applies a profile after bootstrap; config is reloaded first so `always_installed` from the bootstrap package applies                                     |

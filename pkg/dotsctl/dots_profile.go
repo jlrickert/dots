@@ -2,32 +2,38 @@ package dotsctl
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/jlrickert/dots/pkg/dots"
 )
 
-// ProfileCreate creates a new empty profile.
-func (d *Dots) ProfileCreate(ctx context.Context, name string) error {
-	path := d.profilePath(name)
+// ProfileCreateOptions configures profile creation.
+type ProfileCreateOptions struct {
+	// Name is the new profile's name.
+	Name string
+	// Extends lists parent profiles. Each must exist and must not create a
+	// cycle.
+	Extends []string
+}
+
+// ProfileCreate creates a new profile with no packages of its own.
+func (d *Dots) ProfileCreate(ctx context.Context, opts ProfileCreateOptions) error {
+	path := d.profilePath(opts.Name)
 	if _, err := d.Runtime.Stat(path, false); err == nil {
 		return dots.ErrExist
 	}
 
 	profile := &dots.Profile{
-		Name:     name,
+		Name:     opts.Name,
+		Extends:  appendMissing(dots.StringList(nil), opts.Extends),
 		Packages: []string{},
 	}
-
-	data, err := dots.MarshalProfile(profile)
-	if err != nil {
+	if _, _, err := d.resolveLoadedProfile(profile, nil); err != nil {
 		return err
 	}
-
-	if err := d.Runtime.Mkdir(filepath.Dir(path), 0o755, true); err != nil {
-		return err
-	}
-	return d.Runtime.WriteFile(path, data, 0o644)
+	return d.saveProfile(profile)
 }
 
 // ProfileDelete removes a profile definition.
@@ -66,9 +72,35 @@ func (d *Dots) ProfileList(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// ProfileShow returns the profile definition.
-func (d *Dots) ProfileShow(ctx context.Context, name string) (*dots.Profile, error) {
-	return d.loadProfile(name)
+// ProfileShowResult holds a profile definition and its resolution.
+type ProfileShowResult struct {
+	Profile *dots.Profile
+	// Resolved is the list apply would install, including
+	// core.always_installed, with the source of each package.
+	Resolved []ResolvedPackage
+	// UnmatchedExcludes lists excludes that match no inherited package.
+	UnmatchedExcludes []string
+}
+
+// ProfileShow returns the profile definition and its resolved package list.
+func (d *Dots) ProfileShow(ctx context.Context, name string) (*ProfileShowResult, error) {
+	profile, err := d.loadProfile(name)
+	if err != nil {
+		return nil, fmt.Errorf("profile %q: %w", name, err)
+	}
+	pkgs, unmatched, err := d.resolveLoadedProfile(profile, nil)
+	if err != nil {
+		return nil, err
+	}
+	resolved, err := d.withAlwaysInstalled(pkgs)
+	if err != nil {
+		return nil, err
+	}
+	return &ProfileShowResult{
+		Profile:           profile,
+		Resolved:          resolved,
+		UnmatchedExcludes: unmatched,
+	}, nil
 }
 
 // ProfileAdd adds packages to a profile.
@@ -108,6 +140,68 @@ func (d *Dots) ProfileRemove(ctx context.Context, name, pkg string) error {
 	profile.Packages = filtered
 
 	return d.saveProfile(profile)
+}
+
+// ProfileExtend adds parent profiles to a profile's extends list. The change
+// is rejected if a parent is missing or it would create a cycle.
+func (d *Dots) ProfileExtend(ctx context.Context, name string, parents []string) error {
+	return d.updateProfile(name, true, func(p *dots.Profile) {
+		p.Extends = appendMissing(p.Extends, parents)
+	})
+}
+
+// ProfileUnextend removes parent profiles from a profile's extends list.
+func (d *Dots) ProfileUnextend(ctx context.Context, name string, parents []string) error {
+	return d.updateProfile(name, false, func(p *dots.Profile) {
+		p.Extends = removeAll(p.Extends, parents)
+	})
+}
+
+// ProfileExclude adds packages to a profile's exclude list.
+func (d *Dots) ProfileExclude(ctx context.Context, name string, packages []string) error {
+	return d.updateProfile(name, false, func(p *dots.Profile) {
+		p.Exclude = appendMissing(p.Exclude, packages)
+	})
+}
+
+// ProfileUnexclude removes packages from a profile's exclude list.
+func (d *Dots) ProfileUnexclude(ctx context.Context, name string, packages []string) error {
+	return d.updateProfile(name, false, func(p *dots.Profile) {
+		p.Exclude = removeAll(p.Exclude, packages)
+	})
+}
+
+// updateProfile loads a profile, applies edit, optionally validates that the
+// result still resolves, and saves it.
+func (d *Dots) updateProfile(name string, validate bool, edit func(*dots.Profile)) error {
+	profile, err := d.loadProfile(name)
+	if err != nil {
+		return fmt.Errorf("profile %q: %w", name, err)
+	}
+	edit(profile)
+	if validate {
+		if _, _, err := d.resolveLoadedProfile(profile, nil); err != nil {
+			return err
+		}
+	}
+	return d.saveProfile(profile)
+}
+
+// appendMissing appends each item not already in list, preserving order.
+func appendMissing[S ~[]string](list S, items []string) S {
+	for _, item := range items {
+		if !slices.Contains(list, item) {
+			list = append(list, item)
+		}
+	}
+	return list
+}
+
+// removeAll returns list without any of items.
+func removeAll[S ~[]string](list S, items []string) S {
+	return slices.DeleteFunc(list, func(s string) bool {
+		return slices.Contains(items, s)
+	})
 }
 
 // ProfileExport returns the profile as YAML bytes.

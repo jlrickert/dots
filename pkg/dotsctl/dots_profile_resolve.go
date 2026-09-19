@@ -39,14 +39,21 @@ func (d *Dots) resolveProfile(name string, stack []string) ([]ResolvedPackage, e
 		return nil, fmt.Errorf("profile %q: %w", name, err)
 	}
 
-	stack = append(slices.Clone(stack), name)
+	resolved, _, err := d.resolveLoadedProfile(profile, stack)
+	return resolved, err
+}
+
+// resolveLoadedProfile resolves an already-loaded profile, which may not be
+// saved yet. It also returns the excludes that matched no inherited package.
+func (d *Dots) resolveLoadedProfile(profile *dots.Profile, stack []string) ([]ResolvedPackage, []string, error) {
+	stack = append(slices.Clone(stack), profile.Name)
 
 	var inherited []ResolvedPackage
 	seen := make(map[string]struct{})
 	for _, parent := range profile.Extends {
 		pkgs, err := d.resolveProfile(parent, stack)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, p := range pkgs {
 			if _, ok := seen[p.Ref]; ok {
@@ -54,6 +61,13 @@ func (d *Dots) resolveProfile(name string, stack []string) ([]ResolvedPackage, e
 			}
 			seen[p.Ref] = struct{}{}
 			inherited = append(inherited, p)
+		}
+	}
+
+	var unmatched []string
+	for _, ref := range profile.Exclude {
+		if _, ok := seen[ref]; !ok {
+			unmatched = append(unmatched, ref)
 		}
 	}
 
@@ -71,9 +85,9 @@ func (d *Dots) resolveProfile(name string, stack []string) ([]ResolvedPackage, e
 			continue
 		}
 		seen[ref] = struct{}{}
-		resolved = append(resolved, ResolvedPackage{Ref: ref, Source: name})
+		resolved = append(resolved, ResolvedPackage{Ref: ref, Source: profile.Name})
 	}
-	return resolved, nil
+	return resolved, unmatched, nil
 }
 
 // resolveProfileForApply resolves a profile and prepends the platform-resolved
@@ -83,7 +97,11 @@ func (d *Dots) resolveProfileForApply(name string) ([]ResolvedPackage, error) {
 	if err != nil {
 		return nil, err
 	}
+	return d.withAlwaysInstalled(pkgs)
+}
 
+// withAlwaysInstalled prepends core.always_installed to pkgs, deduped.
+func (d *Dots) withAlwaysInstalled(pkgs []ResolvedPackage) ([]ResolvedPackage, error) {
 	cfg, err := d.ConfigService.Config(true)
 	if err != nil {
 		return nil, err
