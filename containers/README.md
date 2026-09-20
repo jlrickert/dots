@@ -29,12 +29,68 @@ Or via Taskfile:
 ```bash
 task podman:build
 task podman:test
-task podman:shell
+task podman:test:profiles
 ```
 
-`task podman:test` and `task podman:shell` declare `podman:build` as a
-dependency, so they will (re)build the image on demand. The `sources:` cache
-on `podman:build` skips rebuilds when nothing relevant has changed.
+Each task declares its build as a dependency, so images are (re)built on
+demand. The `sources:` cache skips rebuilds when nothing relevant has changed.
+
+## Manual testing
+
+Three interactive shells, each mounting your `~/.ssh`:
+
+| Task                  | Image                 | State inside                                                |
+| --------------------- | --------------------- | ----------------------------------------------------------- |
+| `task shell`          | `dots-test:machine`   | Clean machine: dots, git, ssh, no taps, nothing installed   |
+| `task shell:fixture`  | `dots-test:dev`       | Synthetic fixture tap bootstrapped, all packages installed  |
+| `task shell:profiles` | `dots-test:profiles`  | Profiles fixture bootstrapped, no profile applied yet       |
+
+`task shell` is the one to use for a real bootstrap:
+
+```bash
+task shell
+# inside the container:
+dots init --from git@github.com:jlrickert/dotfiles.git --path dots-config --name jlrickert
+dots status
+dots profile show work
+dots profile apply work --dry-run
+```
+
+### How the ssh mount works
+
+The shell tasks mount `~/.ssh` read-only at `/mnt/ssh`, and
+`containers/entry-live.sh` copies it to `~/.ssh` inside the container before
+handing you a shell. The copy exists because rootless podman maps host-owned
+files to root inside the container, and ssh refuses a private key it does not
+own. Nothing is written back to the host, and the copy dies with the
+container.
+
+Notes:
+
+- Key files must be on disk. Agent forwarding does not reach the podman VM on
+  macOS. A passphrase-protected key still works — you get the prompt.
+- The container's `known_hosts` is a writable copy, so
+  `StrictHostKeyChecking` prompts behave normally.
+- `podman machine` mounts `/Users` on macOS, which is what makes the mount
+  reachable at all.
+
+## Profiles fixture
+
+`containers/fixture-profiles/` is a second tap built around the dots package
+pattern from [docs/bootstrapping.md](../docs/bootstrapping.md): `dots-config`
+links `config.yaml` plus three profile files, and sets
+`core.always_installed: [fixture/dots-config]` so applying a profile can never
+uninstall the package that owns the config.
+
+| Profile    | Definition                                              |
+| ---------- | -------------------------------------------------------- |
+| `base`     | `shell-basic`, `tmux-ish`                                |
+| `work`     | extends `base`, adds `zellij-ish`, excludes `tmux-ish`   |
+| `personal` | extends `base`                                           |
+
+`verify-profiles.sh` applies `work`, then `personal`, and asserts that the
+reconcile removes what left the profile, installs what joined it, keeps the
+always-installed bootstrap package, and that `--dry-run` changes nothing.
 
 ## What gets exercised
 

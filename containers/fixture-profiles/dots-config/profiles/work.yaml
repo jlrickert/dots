@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/profile.json
+#
+# Inherits base but swaps tmux for zellij, exercising exclude.
+name: work
+extends: base
+packages:
+  - fixture/zellij-ish
+exclude:
+  - fixture/tmux-ish

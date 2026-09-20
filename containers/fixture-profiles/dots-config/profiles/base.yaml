@@ -1,0 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/profile.json
+name: base
+packages:
+  - fixture/shell-basic
+  - fixture/tmux-ish

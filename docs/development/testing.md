@@ -23,12 +23,27 @@ go test -race ./pkg/dots/...                   # with race detector
 End-to-end smoke tests run the real binary inside a podman image and execute `containers/verify.sh`:
 
 ```bash
-task podman:build       # build the dots-test:dev image
-task podman:test        # run verify.sh inside it
-task podman:shell       # debug shell inside the image
-task package:deb        # build .deb artifacts via goreleaser snapshot
-task podman:build:deb   # build the test image from the .deb
-task podman:test:deb    # run verify.sh against the .deb image
+task podman:test            # smoke image: verify.sh (fixture tap + installs)
+task podman:test:profiles   # profiles fixture: verify-profiles.sh
+task package:deb            # build .deb artifacts via goreleaser snapshot
+task podman:test:deb        # run verify.sh against the .deb image
 ```
+
+## Manual Testing
+
+Interactive shells, each with your `~/.ssh` mounted so real `git@…` clones
+work:
+
+```bash
+task shell            # clean machine: no taps, nothing installed
+task shell:fixture    # smoke fixture, bootstrapped and installed
+task shell:profiles   # profiles fixture, nothing applied yet
+```
+
+Use `task shell` to exercise a real bootstrap end to end (`dots init --from
+git@github.com:… --path dots-config --name <tap>`).
+
+Note for anyone editing the Containerfile: `profiles` is the last stage, so
+every build must pass an explicit `--target` (`runtime` for the smoke image).
 
 See [containers/README.md](../../containers/README.md) for details.

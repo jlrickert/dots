@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dotfile.json
+package:
+  name: zellij-ish
+  description: Profiles fixture package (zellij-ish)
+  version: 0.1.0
+links:
+  rc: '@config/zellij-ish/rc'

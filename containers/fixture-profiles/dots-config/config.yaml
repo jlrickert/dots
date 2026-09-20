@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dots-config.json
+#
+# always_installed keeps this bootstrap package installed no matter which
+# profile is applied — without it, applying a profile that omits dots-config
+# would uninstall the package that owns this file. See
+# docs/profiles.md#always-installed-packages.
+core:
+  conflict_strategy: prompt
+  backup: true
+  link_strategy: copy
+  always_installed:
+    - fixture/dots-config

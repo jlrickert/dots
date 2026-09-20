@@ -5,6 +5,14 @@ version: "3"
 vars:
   IMAGE_NAME: dots-test:dev
   IMAGE_NAME_DEB: dots-test:deb
+  IMAGE_NAME_MACHINE: dots-test:machine
+  IMAGE_NAME_PROFILES: dots-test:profiles
+  # Interactive shells mount the host's ~/.ssh read-only; entry-live.sh copies
+  # it into the container so ssh accepts the keys. See containers/README.md.
+  SHELL_RUN: >-
+    podman run --rm -it
+    -v "{{env "HOME"}}/.ssh:/mnt/ssh:ro"
+    --entrypoint /usr/local/lib/dots-test/entry-live.sh
 
 tasks:
   run: go run ./cmd/dots {{.CLI_ARGS}}
@@ -36,7 +44,7 @@ tasks:
   podman:build:
     desc: "Build the dots-test:dev smoke image into local podman storage."
     cmds:
-      - podman build -t {{.IMAGE_NAME}} .
+      - podman build --target runtime -t {{.IMAGE_NAME}} .
     sources:
       - Taskfile.yml
       - Containerfile
@@ -51,16 +59,61 @@ tasks:
     deps: [podman:build]
     cmds:
       - podman run --rm {{.IMAGE_NAME}}
-  podman:shell:
-    desc: "Drop into a bash shell inside the dots-test:dev image (debug)."
+  build:machine:
+    desc: "Build the clean-machine image (dots + git + ssh, nothing installed)."
+    cmds:
+      - podman build --target machine -t {{.IMAGE_NAME_MACHINE}} .
+    sources:
+      - Taskfile.yml
+      - Containerfile
+      - .containerignore
+      - cmd/**/*.go
+      - pkg/**/*.go
+      - go.mod
+      - go.sum
+      - containers/**/*
+  build:profiles:
+    desc: "Build the profiles-fixture image."
+    cmds:
+      - podman build --target profiles -t {{.IMAGE_NAME_PROFILES}} .
+    sources:
+      - Taskfile.yml
+      - Containerfile
+      - .containerignore
+      - cmd/**/*.go
+      - pkg/**/*.go
+      - go.mod
+      - go.sum
+      - containers/**/*
+  shell:
+    desc: "Shell into a clean machine (no taps, no packages). Your ~/.ssh is mounted."
+    deps: [build:machine]
+    cmds:
+      - '{{.SHELL_RUN}} {{.IMAGE_NAME_MACHINE}} bash -l'
+  shell:fixture:
+    desc: "Shell into the smoke fixture image (tap bootstrapped, packages installed)."
     deps: [podman:build]
     cmds:
-      - podman run --rm -it --entrypoint bash {{.IMAGE_NAME}}
+      - '{{.SHELL_RUN}} {{.IMAGE_NAME}} bash -l'
+  shell:profiles:
+    desc: "Shell into the profiles fixture (bootstrapped, no profile applied yet)."
+    deps: [build:profiles]
+    cmds:
+      - '{{.SHELL_RUN}} {{.IMAGE_NAME_PROFILES}} bash -l'
+  podman:test:profiles:
+    desc: "Run the profiles fixture checks (executes containers/verify-profiles.sh)."
+    deps: [build:profiles]
+    cmds:
+      - podman run --rm {{.IMAGE_NAME_PROFILES}}
+  podman:shell:
+    desc: "Alias for `task shell:fixture`."
+    cmds:
+      - task: shell:fixture
   podman:build:deb:
     desc: "Build the dots-test image from the .deb produced by `task package:deb`."
     deps: [package:deb]
     cmds:
-      - podman build --build-arg BUILD_FROM=deb -t {{.IMAGE_NAME_DEB}} .
+      - podman build --target runtime --build-arg BUILD_FROM=deb -t {{.IMAGE_NAME_DEB}} .
   podman:test:deb:
     desc: "Run the dots-test image built from the .deb (executes containers/verify.sh)."
     deps: [podman:build:deb]

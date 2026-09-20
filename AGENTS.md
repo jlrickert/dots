@@ -28,7 +28,7 @@ go test -race ./pkg/dots/...                   # with race detector
 go vet ./...                                   # lint
 ```
 
-- `task install` installs the CLI; `task podman:build` + `task podman:test` run the container smoke tests.
+- `task install` installs the CLI. `task podman:test` and `task podman:test:profiles` run the container checks; `task shell`, `task shell:fixture`, and `task shell:profiles` drop into throwaway machines for manual testing.
 - Request flow: `pkg/cli` (Cobra) → `pkg/dotsctl.Dots` → `pkg/dots.Repository`.
 - New service operation: add `pkg/dotsctl/dots_<op>.go` with an `<Op>Options` struct and a method on `*Dots`. New CLI command: add `pkg/cli/cmd_<name>.go`.
 - Commits: conventional commits (`feat:`, `fix:`, `refactor:`, `docs:`), summary ≤72 chars, no co-author lines.
