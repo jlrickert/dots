@@ -111,7 +111,7 @@ This creates a default config at `~/.config/dots/config.yaml` (Unix) or `%APPDAT
 | Feature                            | Status  | Notes                                                                                                                                                    |
 | ---------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Core Operations**                |         |                                                                                                                                                          |
-| Init (`--from`, `--path`)          | Done    | Self-bootstrapping from existing repo                                                                                                                    |
+| Init (`--from`, `--path`, `--apply`) | Done    | Self-bootstrapping from existing repo, then optional profile apply                                                                                       |
 | Install                            | Done    | Manifest parsing, platform cascade, hooks, lockfile, `--dry-run`, `--strategy`                                                                           |
 | Remove                             | Done    | Lockfile lookup, link removal, backup restore, hooks                                                                                                     |
 | Upgrade (`--all`)                  | Done    | Tap update + reinstall                                                                                                                                   |
@@ -126,9 +126,14 @@ This creates a default config at `~/.config/dots/config.yaml` (Unix) or `%APPDAT
 | Diff                               | Done    | Checksum comparison for copy-strategy files                                                                                                              |
 | Which                              | Done    | Identify which package owns a file                                                                                                                       |
 | **Profiles**                       |         |                                                                                                                                                          |
-| Full CRUD + apply / switch         | Done    | create, delete, list, show, add, remove, apply, switch                                                                                                   |
+| Full CRUD + apply                  | Done    | create (`--extends`), delete, list, show (resolved, with sources), add, remove, extend, unextend, exclude, unexclude, apply                              |
+| Reconciling `profile apply`        | Done    | Removes packages not in the profile, installs missing ones, `--dry-run`. Replaces `profile switch`                                                       |
+| Inheritance (`extends`)            | Done    | Multiple parents, first-occurrence dedup, cycle detection                                                                                                |
+| Profile `exclude`                  | Done    | Drops inherited packages; `exclude`/`unexclude` commands; `show` flags unmatched excludes                                                                |
+| Active profile in lockfile only    | Done    | `state.active_profile` in the lockfile; `core.active_profile` is no longer read                                                                          |
+| Always-installed packages          | Done    | `core.always_installed` in config; included in every profile apply, overrides `exclude`. See [Profiles](docs/profiles.md#always-installed-packages)      |
+| `dots init --apply`                | Done    | Applies a profile after bootstrap; config is reloaded first so `always_installed` from the bootstrap package applies                                     |
 | Export / Import                    | Done    | YAML-based profile sharing                                                                                                                               |
-| Inheritance (`extends`)            | Done    | Chain resolution with dedup                                                                                                                              |
 | **Work Mode**                      |         |                                                                                                                                                          |
 | On / Off / Status / Rebuild        | Done    | Automatic re-linking on toggle                                                                                                                           |
 | **Sync**                           |         |                                                                                                                                                          |
@@ -206,11 +211,11 @@ Profiles are named lists of packages that can be applied together:
 ```bash
 dots profile create work
 dots profile add work personal/zsh personal/nvim personal/git
-dots profile apply work
-dots profile switch personal   # switch to a different profile
+dots profile apply work        # install work's packages, remove everything else
+dots profile apply personal    # change to a different profile
 ```
 
-Profiles support inheritance via `extends` and can be exported/imported:
+Profiles can extend one or more other profiles, exclude inherited packages, and be exported/imported:
 
 ```bash
 dots profile export work > work-profile.yaml
@@ -326,4 +331,4 @@ For the full configuration reference, see [config.yaml Reference](docs/config-ya
 | [Work Mode](docs/work-mode.md)                 | Development workflow with local checkouts           |
 | [Bootstrapping](docs/bootstrapping.md)         | Self-bootstrapping and machine recovery             |
 
-For the design specification, see [dots-design.md](dots-design.md).
+The docs above are the source of truth for dots behavior; [dots-design.md](dots-design.md) is the original design record. Contributor docs (architecture, testing, errors, schemas) live in [docs/development/](docs/development/); agent guidance is in [AGENTS.md](AGENTS.md).

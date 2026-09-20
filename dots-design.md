@@ -1,5 +1,7 @@
 # dots — System Design (v5)
 
+> Historical design record. The docs in [docs/](docs/) are authoritative; where they differ, docs/ wins.
+
 A brew-style dotfile package manager with taps, profiles, overlays, and cross-platform support.
 
 ---

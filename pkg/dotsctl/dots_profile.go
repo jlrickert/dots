@@ -3,50 +3,57 @@ package dotsctl
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/jlrickert/dots/pkg/dots"
 )
 
-// ProfileCreate creates a new empty profile.
-func (d *Dots) ProfileCreate(ctx context.Context, name string) error {
-	path := d.profilePath(name)
-	if _, err := os.Stat(path); err == nil {
+// ProfileCreateOptions configures profile creation.
+type ProfileCreateOptions struct {
+	// Name is the new profile's name.
+	Name string
+	// Extends lists parent profiles. Each must exist and must not create a
+	// cycle.
+	Extends []string
+}
+
+// ProfileCreate creates a new profile with no packages of its own.
+func (d *Dots) ProfileCreate(ctx context.Context, opts ProfileCreateOptions) error {
+	path := d.profilePath(opts.Name)
+	if _, err := d.Runtime.Stat(path, false); err == nil {
 		return dots.ErrExist
 	}
 
 	profile := &dots.Profile{
-		Name:     name,
+		Name:     opts.Name,
+		Extends:  appendMissing(dots.StringList(nil), opts.Extends),
 		Packages: []string{},
 	}
-
-	data, err := dots.MarshalProfile(profile)
-	if err != nil {
+	if _, _, err := d.resolveLoadedProfile(profile, nil); err != nil {
 		return err
 	}
-
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
+	return d.saveProfile(profile)
 }
 
 // ProfileDelete removes a profile definition.
 func (d *Dots) ProfileDelete(ctx context.Context, name string) error {
 	path := d.profilePath(name)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return dots.ErrNotExist
+	if _, err := d.Runtime.Stat(path, false); err != nil {
+		if isNotExist(err) {
+			return dots.ErrNotExist
+		}
+		return err
 	}
-	return os.Remove(path)
+	return d.Runtime.Remove(path, false)
 }
 
 // ProfileList returns all available profile names.
 func (d *Dots) ProfileList(ctx context.Context) ([]string, error) {
 	dir := d.PathService.ProfilesDir()
-	entries, err := os.ReadDir(dir)
+	entries, err := d.Runtime.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExist(err) {
 			return nil, nil
 		}
 		return nil, err
@@ -65,9 +72,35 @@ func (d *Dots) ProfileList(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// ProfileShow returns the profile definition.
-func (d *Dots) ProfileShow(ctx context.Context, name string) (*dots.Profile, error) {
-	return d.loadProfile(name)
+// ProfileShowResult holds a profile definition and its resolution.
+type ProfileShowResult struct {
+	Profile *dots.Profile
+	// Resolved is the list apply would install, including
+	// core.always_installed, with the source of each package.
+	Resolved []ResolvedPackage
+	// UnmatchedExcludes lists excludes that match no inherited package.
+	UnmatchedExcludes []string
+}
+
+// ProfileShow returns the profile definition and its resolved package list.
+func (d *Dots) ProfileShow(ctx context.Context, name string) (*ProfileShowResult, error) {
+	profile, err := d.loadProfile(name)
+	if err != nil {
+		return nil, fmt.Errorf("profile %q: %w", name, err)
+	}
+	pkgs, unmatched, err := d.resolveLoadedProfile(profile, nil)
+	if err != nil {
+		return nil, err
+	}
+	resolved, err := d.withAlwaysInstalled(pkgs)
+	if err != nil {
+		return nil, err
+	}
+	return &ProfileShowResult{
+		Profile:           profile,
+		Resolved:          resolved,
+		UnmatchedExcludes: unmatched,
+	}, nil
 }
 
 // ProfileAdd adds packages to a profile.
@@ -109,43 +142,66 @@ func (d *Dots) ProfileRemove(ctx context.Context, name, pkg string) error {
 	return d.saveProfile(profile)
 }
 
-// ProfileApply installs all packages in a profile.
-func (d *Dots) ProfileApply(ctx context.Context, name string) error {
-	profile, err := d.resolveProfileChain(name)
-	if err != nil {
-		return err
-	}
-
-	for _, pkg := range profile.Packages {
-		_, err := d.Install(ctx, InstallOptions{Package: pkg})
-		if err != nil {
-			return fmt.Errorf("install %s: %w", pkg, err)
-		}
-	}
-
-	// Update active profile in lockfile
-	lockfile, err := d.Repo.ReadLockfile(ctx)
-	if err != nil && !isNotExist(err) {
-		return err
-	}
-	if lockfile == nil {
-		lockfile = &dots.Lockfile{}
-	}
-	lockfile.State.ActiveProfile = name
-	return d.Repo.WriteLockfile(ctx, lockfile)
+// ProfileExtend adds parent profiles to a profile's extends list. The change
+// is rejected if a parent is missing or it would create a cycle.
+func (d *Dots) ProfileExtend(ctx context.Context, name string, parents []string) error {
+	return d.updateProfile(name, true, func(p *dots.Profile) {
+		p.Extends = appendMissing(p.Extends, parents)
+	})
 }
 
-// ProfileSwitch removes current profile packages and applies the new one.
-func (d *Dots) ProfileSwitch(ctx context.Context, name string) error {
-	// Remove currently installed packages
-	lockfile, err := d.Repo.ReadLockfile(ctx)
-	if err == nil {
-		for _, pkg := range lockfile.Installed {
-			_ = d.Remove(ctx, RemoveOptions{Package: pkg.Package})
+// ProfileUnextend removes parent profiles from a profile's extends list.
+func (d *Dots) ProfileUnextend(ctx context.Context, name string, parents []string) error {
+	return d.updateProfile(name, false, func(p *dots.Profile) {
+		p.Extends = removeAll(p.Extends, parents)
+	})
+}
+
+// ProfileExclude adds packages to a profile's exclude list.
+func (d *Dots) ProfileExclude(ctx context.Context, name string, packages []string) error {
+	return d.updateProfile(name, false, func(p *dots.Profile) {
+		p.Exclude = appendMissing(p.Exclude, packages)
+	})
+}
+
+// ProfileUnexclude removes packages from a profile's exclude list.
+func (d *Dots) ProfileUnexclude(ctx context.Context, name string, packages []string) error {
+	return d.updateProfile(name, false, func(p *dots.Profile) {
+		p.Exclude = removeAll(p.Exclude, packages)
+	})
+}
+
+// updateProfile loads a profile, applies edit, optionally validates that the
+// result still resolves, and saves it.
+func (d *Dots) updateProfile(name string, validate bool, edit func(*dots.Profile)) error {
+	profile, err := d.loadProfile(name)
+	if err != nil {
+		return fmt.Errorf("profile %q: %w", name, err)
+	}
+	edit(profile)
+	if validate {
+		if _, _, err := d.resolveLoadedProfile(profile, nil); err != nil {
+			return err
 		}
 	}
+	return d.saveProfile(profile)
+}
 
-	return d.ProfileApply(ctx, name)
+// appendMissing appends each item not already in list, preserving order.
+func appendMissing[S ~[]string](list S, items []string) S {
+	for _, item := range items {
+		if !slices.Contains(list, item) {
+			list = append(list, item)
+		}
+	}
+	return list
+}
+
+// removeAll returns list without any of items.
+func removeAll[S ~[]string](list S, items []string) S {
+	return slices.DeleteFunc(list, func(s string) bool {
+		return slices.Contains(items, s)
+	})
 }
 
 // ProfileExport returns the profile as YAML bytes.
@@ -171,9 +227,9 @@ func (d *Dots) profilePath(name string) string {
 }
 
 func (d *Dots) loadProfile(name string) (*dots.Profile, error) {
-	data, err := os.ReadFile(d.profilePath(name))
+	data, err := d.Runtime.ReadFile(d.profilePath(name))
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExist(err) {
 			return nil, dots.ErrNotExist
 		}
 		return nil, err
@@ -187,44 +243,8 @@ func (d *Dots) saveProfile(profile *dots.Profile) error {
 		return err
 	}
 	path := d.profilePath(profile.Name)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := d.Runtime.Mkdir(filepath.Dir(path), 0o755, true); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
-}
-
-// resolveProfileChain resolves a profile and its extends chain.
-func (d *Dots) resolveProfileChain(name string) (*dots.Profile, error) {
-	profile, err := d.loadProfile(name)
-	if err != nil {
-		return nil, err
-	}
-
-	if profile.Extends == "" {
-		return profile, nil
-	}
-
-	parent, err := d.resolveProfileChain(profile.Extends)
-	if err != nil {
-		return nil, fmt.Errorf("resolve parent profile %s: %w", profile.Extends, err)
-	}
-
-	// Merge: parent packages first, then child's (dedup)
-	seen := make(map[string]struct{})
-	var merged []string
-	for _, p := range parent.Packages {
-		if _, ok := seen[p]; !ok {
-			merged = append(merged, p)
-			seen[p] = struct{}{}
-		}
-	}
-	for _, p := range profile.Packages {
-		if _, ok := seen[p]; !ok {
-			merged = append(merged, p)
-			seen[p] = struct{}{}
-		}
-	}
-
-	profile.Packages = merged
-	return profile, nil
+	return d.Runtime.WriteFile(path, data, 0o644)
 }

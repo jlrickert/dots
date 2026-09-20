@@ -3,6 +3,9 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
+
+	"github.com/jlrickert/dots/pkg/dotsctl"
 
 	"github.com/spf13/cobra"
 )
@@ -20,8 +23,11 @@ func newProfileCmd(deps *Deps) *cobra.Command {
 		newProfileShowCmd(deps),
 		newProfileAddCmd(deps),
 		newProfileRemoveCmd(deps),
+		newProfileExtendCmd(deps),
+		newProfileUnextendCmd(deps),
+		newProfileExcludeCmd(deps),
+		newProfileUnexcludeCmd(deps),
 		newProfileApplyCmd(deps),
-		newProfileSwitchCmd(deps),
 		newProfileExportCmd(deps),
 		newProfileImportCmd(deps),
 	)
@@ -30,7 +36,8 @@ func newProfileCmd(deps *Deps) *cobra.Command {
 }
 
 func newProfileCreateCmd(deps *Deps) *cobra.Command {
-	return &cobra.Command{
+	var extends []string
+	cmd := &cobra.Command{
 		Use:   "create <name>",
 		Short: "Create a new profile",
 		Args:  cobra.ExactArgs(1),
@@ -39,13 +46,20 @@ func newProfileCreateCmd(deps *Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := d.ProfileCreate(cmd.Context(), args[0]); err != nil {
+			err = d.ProfileCreate(cmd.Context(), dotsctl.ProfileCreateOptions{
+				Name:    args[0],
+				Extends: extends,
+			})
+			if err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Created profile %s\n", args[0])
 			return nil
 		},
 	}
+	cmd.Flags().StringArrayVar(&extends, "extends", nil, "Parent profile to inherit from (repeatable)")
+	_ = cmd.RegisterFlagCompletionFunc("extends", completeProfileNames(deps))
+	return cmd
 }
 
 func newProfileDeleteCmd(deps *Deps) *cobra.Command {
@@ -102,18 +116,37 @@ func newProfileShowCmd(deps *Deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			profile, err := d.ProfileShow(cmd.Context(), args[0])
+			result, err := d.ProfileShow(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
+			profile := result.Profile
 			out := cmd.OutOrStdout()
 			fmt.Fprintf(out, "Name:     %s\n", profile.Name)
-			if profile.Extends != "" {
-				fmt.Fprintf(out, "Extends:  %s\n", profile.Extends)
+			if len(profile.Extends) > 0 {
+				fmt.Fprintf(out, "Extends:  %s\n", strings.Join(profile.Extends, ", "))
+			}
+			if len(profile.Exclude) > 0 {
+				fmt.Fprintf(out, "Exclude:  %s\n", strings.Join(profile.Exclude, ", "))
 			}
 			fmt.Fprintln(out, "Packages:")
 			for _, pkg := range profile.Packages {
 				fmt.Fprintf(out, "  %s\n", pkg)
+			}
+
+			width := 0
+			for _, p := range result.Resolved {
+				width = max(width, len(p.Ref))
+			}
+			fmt.Fprintln(out, "Resolved:")
+			for _, p := range result.Resolved {
+				fmt.Fprintf(out, "  %-*s  (%s)\n", width, p.Ref, p.Source)
+			}
+			if len(result.UnmatchedExcludes) > 0 {
+				fmt.Fprintln(out, "Unmatched excludes (no parent provides these):")
+				for _, ref := range result.UnmatchedExcludes {
+					fmt.Fprintf(out, "  %s\n", ref)
+				}
 			}
 			return nil
 		},
@@ -174,44 +207,132 @@ func newProfileRemoveCmd(deps *Deps) *cobra.Command {
 	return cmd
 }
 
-func newProfileApplyCmd(deps *Deps) *cobra.Command {
+func newProfileExtendCmd(deps *Deps) *cobra.Command {
+	return newProfileListEditCmd(deps, profileListEdit{
+		use:      "extend <name> <parent>...",
+		short:    "Add parent profiles to a profile",
+		done:     "Profile %s now extends %s\n",
+		complete: completeProfileNames(deps),
+		run: func(d *dotsctl.Dots, cmd *cobra.Command, name string, items []string) error {
+			return d.ProfileExtend(cmd.Context(), name, items)
+		},
+	})
+}
+
+func newProfileUnextendCmd(deps *Deps) *cobra.Command {
+	return newProfileListEditCmd(deps, profileListEdit{
+		use:      "unextend <name> <parent>...",
+		short:    "Remove parent profiles from a profile",
+		done:     "Profile %s no longer extends %s\n",
+		complete: completeProfileNames(deps),
+		run: func(d *dotsctl.Dots, cmd *cobra.Command, name string, items []string) error {
+			return d.ProfileUnextend(cmd.Context(), name, items)
+		},
+	})
+}
+
+func newProfileExcludeCmd(deps *Deps) *cobra.Command {
+	return newProfileListEditCmd(deps, profileListEdit{
+		use:      "exclude <name> <tap>/<package>...",
+		short:    "Exclude inherited packages from a profile",
+		done:     "Profile %s now excludes %s\n",
+		complete: completeAvailablePackages(deps),
+		run: func(d *dotsctl.Dots, cmd *cobra.Command, name string, items []string) error {
+			return d.ProfileExclude(cmd.Context(), name, items)
+		},
+	})
+}
+
+func newProfileUnexcludeCmd(deps *Deps) *cobra.Command {
+	return newProfileListEditCmd(deps, profileListEdit{
+		use:      "unexclude <name> <tap>/<package>...",
+		short:    "Stop excluding packages from a profile",
+		done:     "Profile %s no longer excludes %s\n",
+		complete: completeAvailablePackages(deps),
+		run: func(d *dotsctl.Dots, cmd *cobra.Command, name string, items []string) error {
+			return d.ProfileUnexclude(cmd.Context(), name, items)
+		},
+	})
+}
+
+// profileListEdit describes a subcommand that edits one of a profile's lists
+// (extends or exclude) with "<name> <item>..." arguments.
+type profileListEdit struct {
+	use      string
+	short    string
+	done     string
+	complete cobra.CompletionFunc
+	run      func(d *dotsctl.Dots, cmd *cobra.Command, name string, items []string) error
+}
+
+func newProfileListEditCmd(deps *Deps, e profileListEdit) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "apply <name>",
-		Short: "Install all packages in a profile",
-		Args:  cobra.ExactArgs(1),
+		Use:   e.use,
+		Short: e.short,
+		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			d, err := newDotsService(deps)
 			if err != nil {
 				return err
 			}
-			if err := d.ProfileApply(cmd.Context(), args[0]); err != nil {
+			if err := e.run(d, cmd, args[0], args[1:]); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Applied profile %s\n", args[0])
+			fmt.Fprintf(cmd.OutOrStdout(), e.done, args[0], strings.Join(args[1:], ", "))
 			return nil
 		},
 	}
-	cmd.ValidArgsFunction = completeProfileNames(deps)
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return completeProfileNames(deps)(cmd, args, toComplete)
+		}
+		return e.complete(cmd, nil, toComplete)
+	}
 	return cmd
 }
 
-func newProfileSwitchCmd(deps *Deps) *cobra.Command {
+func newProfileApplyCmd(deps *Deps) *cobra.Command {
+	var dryRun bool
 	cmd := &cobra.Command{
-		Use:   "switch <name>",
-		Short: "Switch to a different profile",
-		Args:  cobra.ExactArgs(1),
+		Use:   "apply <name>",
+		Short: "Make installed packages match a profile",
+		Long: `Make installed packages match a profile exactly.
+
+Uninstalls every installed package that is not in the profile's resolved list
+(plus core.always_installed), including packages installed by hand, installs
+the missing ones, and records the profile as active.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			d, err := newDotsService(deps)
 			if err != nil {
 				return err
 			}
-			if err := d.ProfileSwitch(cmd.Context(), args[0]); err != nil {
+			result, err := d.ProfileApply(cmd.Context(), dotsctl.ProfileApplyOptions{
+				Name:   args[0],
+				DryRun: dryRun,
+			})
+			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Switched to profile %s\n", args[0])
+
+			out := cmd.OutOrStdout()
+			if result.DryRun {
+				fmt.Fprintln(out, "Dry run — no changes made:")
+			}
+			for _, ref := range result.Remove {
+				fmt.Fprintf(out, "  remove  %s\n", ref)
+			}
+			for _, ref := range result.Install {
+				fmt.Fprintf(out, "  install %s\n", ref)
+			}
+			if !result.DryRun {
+				fmt.Fprintf(out, "Applied profile %s (%d removed, %d installed, %d unchanged)\n",
+					result.Profile, len(result.Remove), len(result.Install), len(result.Keep))
+			}
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print what would be removed and installed without changing anything")
 	cmd.ValidArgsFunction = completeProfileNames(deps)
 	return cmd
 }

@@ -34,7 +34,6 @@ func (d *Dots) Status(ctx context.Context) (*StatusResult, error) {
 		ConfigDir:    d.PathService.ConfigDir(),
 		StateDir:     d.PathService.StateDir(),
 		LinkStrategy: core.LinkStrategy,
-		Profile:      core.ActiveProfile,
 	}
 
 	taps, err := d.Repo.ListTaps(ctx)
@@ -45,9 +44,7 @@ func (d *Dots) Status(ctx context.Context) (*StatusResult, error) {
 	lockfile, err := d.Repo.ReadLockfile(ctx)
 	if err == nil {
 		result.PackageCount = len(lockfile.Installed)
-		if lockfile.State.ActiveProfile != "" {
-			result.Profile = lockfile.State.ActiveProfile
-		}
+		result.Profile = lockfile.State.ActiveProfile
 	}
 
 	return result, nil

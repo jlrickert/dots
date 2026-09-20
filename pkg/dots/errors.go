@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Sentinel errors for simple equality checks.
@@ -44,6 +45,20 @@ func (e *PackageNotFoundError) Error() string {
 
 func (e *PackageNotFoundError) Is(target error) bool {
 	return target == ErrNotExist
+}
+
+// ProfileCycleError is returned when a profile's extends chain loops back on
+// itself. Chain lists the profiles in order, ending with the repeated name.
+type ProfileCycleError struct {
+	Chain []string
+}
+
+func (e *ProfileCycleError) Error() string {
+	return fmt.Sprintf("profile extends cycle: %s", strings.Join(e.Chain, " → "))
+}
+
+func (e *ProfileCycleError) Is(target error) bool {
+	return target == ErrConflict
 }
 
 // InvalidConfigError represents a validation failure for dots config.

@@ -31,19 +31,22 @@ Core behavior settings.
 
 | Field               | Type    | Default     | Description                                                           |
 | ------------------- | ------- | ----------- | --------------------------------------------------------------------- |
-| `active_profile`    | string  | `""`        | Currently active [profile](profiles.md) name                          |
 | `conflict_strategy` | string  | `"prompt"`  | How to handle file conflicts: `prompt`, `overwrite`, `skip`, `backup` |
 | `backup`            | boolean | `true`      | Back up existing files before overwriting                             |
 | `link_strategy`     | string  | `"symlink"` | Default link strategy: `symlink`, `copy`, `hardlink`                  |
+| `always_installed`  | list    | `[]`        | Packages (`tap/package`) included in every applied [profile](profiles.md#always-installed-packages); cannot be excluded |
+
+The active [profile](profiles.md) is not stored in config; it is tracked per-machine in the lockfile. See [Active Profile](profiles.md#active-profile).
 
 See [Link Strategies - Backup Behavior](link-strategies.md#backup-behavior) for details on each `conflict_strategy`.
 
 ```yaml
 core:
-  active_profile: work
   conflict_strategy: backup
   backup: true
   link_strategy: symlink
+  always_installed:
+    - personal/dots
 ```
 
 ## `git` Section
@@ -124,7 +127,15 @@ platform:
     link_strategy: symlink
 ```
 
-Platform overrides follow the same cascade as [Dotfile.yaml](dotfile-yaml.md): **base core -> OS -> OS-arch**, with more specific values winning.
+Platform overrides follow the same cascade as [Dotfile.yaml](dotfile-yaml.md): **base core -> OS -> OS-arch**, with more specific values winning. Lists concatenate instead: `always_installed` entries from a platform block are added to the base list (deduped), not substituted for it.
+
+```yaml
+core:
+  always_installed: [personal/dots]
+platform:
+  darwin:
+    always_installed: [personal/brew-bundle] # macOS gets dots + brew-bundle
+```
 
 ## Defaults
 
@@ -146,10 +157,11 @@ git:
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/jlrickert/dots/main/schemas/dots-config.json
 core:
-  active_profile: work
   conflict_strategy: backup
   backup: true
   link_strategy: symlink
+  always_installed:
+    - personal/dots
 
 git:
   default_branch: main

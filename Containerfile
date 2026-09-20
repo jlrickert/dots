@@ -11,15 +11,26 @@
 #                     emit completions via `dots completion`.
 #   dots-from-deb   — `apt install /tmp/dist/dots_*_${ARCH}.deb`. Exercises
 #                     the packaging pipeline produced by `task package:deb`.
-#   runtime         — picks dots-from-source or dots-from-deb based on
+#   machine         — picks dots-from-source or dots-from-deb based on
 #                     BUILD_FROM, then layers on the bash/zsh completion
-#                     bootstrap, the tester user, the fixture, and runs
-#                     dots init/install. Entrypoint = verify.sh.
+#                     bootstrap and the tester user. A clean machine with
+#                     dots, git, and ssh but nothing installed. `task shell`.
+#   fixture-src     — machine + the synthetic fixture tap, snapshot-committed.
+#   runtime         — fixture-src + dots init/install of the fixture packages.
+#                     Entrypoint = verify.sh. `task test` / `task shell:fixture`.
+#   profiles        — machine + the profiles fixture tap, bootstrapped but with
+#                     no profile applied. Entrypoint = verify-profiles.sh.
+#                     `task test:profiles` / `task shell:profiles`.
 #
-# Build (default, source variant):
-#   podman build -t dots-test:dev .
+# Build (smoke image, source variant). --target is required: the last stage in
+# this file is `profiles`, so a targetless build would produce that instead.
+#   podman build --target runtime -t dots-test:dev .
+# Build (clean machine):
+#   podman build --target machine -t dots-test:machine .
+# Build (profiles fixture):
+#   podman build --target profiles -t dots-test:profiles .
 # Build (deb variant — requires `task package:deb` first):
-#   podman build --build-arg BUILD_FROM=deb -t dots-test:deb .
+#   podman build --target runtime --build-arg BUILD_FROM=deb -t dots-test:deb .
 # Run:    podman run --rm dots-test:dev
 # Debug:  podman run --rm -it --entrypoint bash dots-test:dev
 #
@@ -57,6 +68,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         git \
         locales \
+        openssh-client \
         python3 \
         sudo \
         tzdata \
@@ -95,11 +107,12 @@ RUN ARCH="$(dpkg --print-architecture)" \
     && rm -rf /var/lib/apt/lists/* /tmp/dist \
     && dots --version
 
-# ---------- Stage: runtime ----------
-# Final image. BUILD_FROM picks which intermediate provides the dots binary
-# and completion scripts; everything below this point is identical across
-# variants.
-FROM dots-from-${BUILD_FROM} AS runtime
+# ---------- Stage: machine ----------
+# Clean machine: the dots binary, shell completion, git, ssh, and a `tester`
+# user, with nothing installed and no tap registered. BUILD_FROM picks which
+# intermediate provides the dots binary and completion scripts; everything
+# below this point is identical across variants.
+FROM dots-from-${BUILD_FROM} AS machine
 
 # bash: append an uncommented bash-completion bootstrap. Ubuntu 24.04 ships
 # /etc/bash.bashrc with the equivalent block commented out — the package
@@ -135,8 +148,25 @@ RUN useradd --create-home --shell /usr/bin/zsh tester \
     && echo 'tester ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/tester \
     && chmod 0440 /etc/sudoers.d/tester
 
+# Fixture worktrees below are owned by uid 1000 (tester) while some steps run
+# as root, so git needs the safe.directory escape hatch image-wide.
+RUN git config --system --add safe.directory '*'
+
+# entry-live.sh backs the interactive `task shell*` targets: it makes a
+# read-only /mnt/ssh mount usable before exec'ing the requested shell.
+COPY containers/entry-live.sh /usr/local/lib/dots-test/entry-live.sh
+RUN chmod +x /usr/local/lib/dots-test/entry-live.sh
+
+ENV SHELL=/bin/bash \
+    HOME=/home/tester
+USER tester
+WORKDIR /home/tester
+
+# ---------- Stage: fixture-src ----------
 # Ship the synthetic fixture under /opt/dotfiles-src. Owned by tester so the
 # snapshot commit (next RUN, run as tester) doesn't trip git's safe.directory.
+FROM machine AS fixture-src
+
 COPY --chown=tester:tester containers/fixture /opt/dotfiles-src
 
 # `dots init --from file://` clones from the COMMITTED git tree, not the
@@ -144,9 +174,6 @@ COPY --chown=tester:tester containers/fixture /opt/dotfiles-src
 # dots repo as plain files, so this stage initializes a one-commit repo
 # inside the image to satisfy that contract. This is the dev/1091 workaround
 # (snapshot-commit pattern).
-USER tester
-ENV SHELL=/bin/bash \
-    HOME=/home/tester
 RUN cd /opt/dotfiles-src \
     && git init -q -b main \
     && git config user.email "build@dots-test.local" \
@@ -154,14 +181,16 @@ RUN cd /opt/dotfiles-src \
     && git add -A \
     && git commit -q -m "fixture snapshot"
 
+# ---------- Stage: runtime ----------
+# The smoke image: bootstraps the fixture tap and installs every fixture
+# package, then runs verify.sh.
+FROM fixture-src AS runtime
+
 # Install as root so any post_install hooks that may want to touch system
 # state (apt, etc.) work. None of the synthetic fixture's hooks do, but the
-# pattern matches the production reference image. The safe.directory glob is
-# required because the fixture worktree is owned by uid 1000 (tester) while
-# we're now running as root.
+# pattern matches the production reference image.
 USER root
-RUN git config --system --add safe.directory '*' \
-    && HOME=/home/tester dots init \
+RUN HOME=/home/tester dots init \
         --from "file:///opt/dotfiles-src" \
         --path dots-config \
         --name fixture \
@@ -183,3 +212,32 @@ RUN chmod +x /usr/local/lib/dots-test/verify.sh /usr/local/lib/dots-test/lib.sh
 USER tester
 WORKDIR /home/tester
 ENTRYPOINT ["/usr/local/lib/dots-test/verify.sh"]
+
+# ---------- Stage: profiles ----------
+# Profiles fixture: a tap whose dots-config ships profiles and sets
+# core.always_installed. Bootstrapped only — no profile is applied, so
+# `dots profile apply` is what you exercise here.
+FROM machine AS profiles
+
+COPY --chown=tester:tester containers/fixture-profiles /opt/dotfiles-profiles
+
+RUN cd /opt/dotfiles-profiles \
+    && git init -q -b main \
+    && git config user.email "build@dots-test.local" \
+    && git config user.name "dots-test build" \
+    && git add -A \
+    && git commit -q -m "profiles fixture snapshot"
+
+USER root
+RUN HOME=/home/tester dots init \
+        --from "file:///opt/dotfiles-profiles" \
+        --path dots-config \
+        --name fixture \
+    && chown -R tester:tester /home/tester
+
+COPY containers/lib.sh containers/verify-profiles.sh /usr/local/lib/dots-test/
+RUN chmod +x /usr/local/lib/dots-test/verify-profiles.sh /usr/local/lib/dots-test/lib.sh
+
+USER tester
+WORKDIR /home/tester
+ENTRYPOINT ["/usr/local/lib/dots-test/verify-profiles.sh"]
